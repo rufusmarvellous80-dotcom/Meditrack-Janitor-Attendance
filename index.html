@@ -228,7 +228,8 @@
         `Name: ${item.name}\nShift: ${item.shift}\nTime In: ${item.timeIn||'-'}\nTime Out: ${item.timeOut||'-'}\nBreak Out: ${item.breakOut||'-'}\nBreak In: ${item.breakIn||'-'}\nStatus: ${item.status}`
       ).join("\n\n");
 
-      emailjs.send("service_itxtkoc","template_mlh2ahf",{to_email:"richieraphaels60@gmail.com",date:todayStr,summary:summaryText})
+      // ✅ Updated email recipient
+      emailjs.send("service_itxtkoc","template_mlh2ahf",{to_email:"dejalizzy25@gmail.com",date:todayStr,summary:summaryText})
       .then(()=>{ if(!auto) alert('Attendance summary sent!'); localStorage.setItem('summarySentForDate',todayStr); })
       .catch(err=>{ if(!auto) alert('Failed to send email: '+JSON.stringify(err)); });
     }
