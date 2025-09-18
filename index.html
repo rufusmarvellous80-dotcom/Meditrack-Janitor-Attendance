@@ -1,401 +1,242 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>MEDITRACK Attendance — Final</title>
+<meta charset="UTF-8">
+<title>MEDITRACK LIMITED Attendance</title>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+  import { getDatabase, ref, onValue, set, push, remove } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
-  <!-- EmailJS -->
-  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-  <!-- Firebase CDN -->
-  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js"></script>
+  // Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyCtVgxfJliYNie4ktvtM3194P5CQJngzn4",
+    authDomain: "meditrack-janitor-s-attendance.firebaseapp.com",
+    databaseURL: "https://meditrack-janitor-s-attendance-default-rtdb.firebaseio.com",
+    projectId: "meditrack-janitor-s-attendance",
+    storageBucket: "meditrack-janitor-s-attendance.firebasestorage.app",
+    messagingSenderId: "31404846429",
+    appId: "1:31404846429:web:d090dcb851b10946050cb4",
+    measurementId: "G-3S7EQGVYWK"
+  };
 
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>
-    :root{ --blue:#4f8ef7; --muted:#f7f7fa; --card:#ffffff; --danger:#d9534f; --ok:#1e7e34; --night:#005cbf; }
-    body{ margin:0; padding:16px; font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial; background:var(--muted); color:#222; }
-    .container{max-width:1100px;margin:0 auto;}
-    h1{text-align:center;margin:6px 0 12px;font-size:1.4rem;}
-    .topbar{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px;}
-    .card{background:var(--card);border-radius:10px;padding:12px;box-shadow:0 4px 18px rgba(0,0,0,0.05);}
-    .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
-    input[type="text"], input[type="date"], input[type="time"]{padding:8px;border-radius:6px;border:1px solid #ddd;font-size:14px;}
-    button{background:var(--blue);color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;}
-    button.secondary{background:#6c757d;}
-    button.remove{background:var(--danger);}
-    .grid{display:grid;grid-template-columns:1fr;gap:12px;}
-    @media(min-width:900px){ .grid{grid-template-columns:1fr 360px;} }
-    table{width:100%;border-collapse:collapse;background:var(--card);border-radius:8px;overflow:hidden;}
-    thead th{background:var(--blue);color:#fff;padding:10px;text-align:center;font-weight:600;font-size:14px;}
-    tbody td{padding:8px;text-align:center;border-bottom:1px solid #eee;font-size:14px;}
-    tbody tr.locked{opacity:0.75;}
-    .status-badge{display:inline-block;padding:6px 8px;border-radius:8px;font-weight:700;color:#fff;font-size:12px;}
-    .status-morning{background:var(--ok);} .status-night{background:var(--night);} .status-none{background:#6c757d;}
-    .muted{color:#666;font-size:13px;}
-    @media (max-width:700px){
-      table, thead, tbody, th, td, tr { display:block; }
-      thead { display:none; }
-      tbody tr { margin-bottom:12px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.03); overflow:hidden; background:var(--card); }
-      tbody td { padding:10px 12px; text-align:right; position:relative; border-bottom:none; }
-      tbody td::before{ content: attr(data-label); position:absolute; left:12px; width:45%; text-align:left; font-weight:600;}
-    }
-    .hidden { display:none !important; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>MEDITRACK LIMITED — Janitor Attendance</h1>
+  // Initialize Firebase and EmailJS
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const staffRef = ref(db, "staff");
+  emailjs.init("Wfz_vJ2NRT4YzMoJV");
+  let emailSentToday = false;
 
-    <div class="topbar">
-      <div class="card" style="display:flex;gap:12px;align-items:center;">
-        <div id="date-today">Date: <strong id="current-date"></strong></div>
-      </div>
-
-      <div class="card controls" style="align-items:center;">
-        <input id="new-staff-name" type="text" placeholder="Add/Remove staff name" />
-        <button id="add-staff-btn">Add Staff</button>
-        <button id="remove-staff-btn" class="remove">Remove Staff</button>
-        <input id="search-name" type="text" placeholder="Search staff..." />
-        <button id="search-btn" class="secondary">Search</button>
-        <button id="clear-search-btn" class="secondary">Clear</button>
-      </div>
-    </div>
-
-    <div class="grid">
-      <div class="card" style="overflow:auto;">
-        <table id="attendance-table" aria-label="attendance table">
-          <thead>
-            <tr>
-              <th style="width:26%;">Name</th>
-              <th>Time In</th>
-              <th>Time Out</th>
-              <th>Break Out</th>
-              <th>Break In</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-
-      <div class="card">
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          <div>
-            <button id="check-attendance">Send Summary Now</button>
-          </div>
-          <div style="margin-top:8px;">
-            <div id="summary-output" style="margin-top:10px;"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-<script>
-/* ===== CONFIG ===== */
-(function(){ emailjs.init("Wfz_vJ2NRT4YzMoJV"); })();
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCtVgxfJliYNie4ktvtM3194P5CQJngzn4",
-  authDomain: "meditrack-janitor-s-attendance.firebaseapp.com",
-  databaseURL: "https://meditrack-janitor-s-attendance-default-rtdb.firebaseio.com",
-  projectId: "meditrack-janitor-s-attendance",
-  storageBucket: "meditrack-janitor-s-attendance.firebasestorage.app",
-  messagingSenderId: "31404846429",
-  appId: "1:31404846429:web:d090dcb851b10946050cb4",
-  measurementId: "G-3S7EQGVYWK"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-
-/* ===== Helpers ===== */
-function todayStr(d = new Date()){
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-function compareTime(t1, t2){
-  if(!t1||!t2) return 0;
-  const [h1,m1]=t1.split(':').map(Number); const [h2,m2]=t2.split(':').map(Number);
-  return (h1*60+m1)-(h2*60+m2);
-}
-function detectShiftByTime(timeIn){
-  if(!timeIn) return null;
-  const [h] = timeIn.split(':').map(Number);
-  if(h >= 4 && h < 16) return 'Morning';
-  return 'Night';
-}
-function escapeHtml(str){ return String(str||'').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
-
-/* compute status text and shift based on record */
-function computeStatus(record){
-  const timeIn = record.timeIn || '';
-  const breakOut = record.breakOut || '';
-  const breakIn = record.breakIn || '';
-  let shift = detectShiftByTime(timeIn);
-  if(!timeIn) return {status: (shift ? `No Time In (${shift})` : ''), shift};
-  let lateMsgs = [];
-  if(shift === 'Morning'){
-    if(compareTime(timeIn,'07:00') < 0 || compareTime(timeIn,'07:10') > 0) lateMsgs.push('Late to Work');
-    if(breakOut && (compareTime(breakOut,'11:00') < 0 || compareTime(breakOut,'12:00') > 0)) lateMsgs.push('Late to Break');
-    if(breakIn && compareTime(breakIn,'12:00') > 0) lateMsgs.push('Late from Break');
-  } else if(shift === 'Night'){
-    if(compareTime(timeIn,'17:00') < 0 || compareTime(timeIn,'17:10') > 0) lateMsgs.push('Late to Work');
-    if(breakOut){
-      const ok = (compareTime(breakOut,'23:00') >= 0 && compareTime(breakOut,'23:59') <= 0) || breakOut === '00:00';
-      if(!ok) lateMsgs.push('Late to Break');
-    }
-    if(breakIn && compareTime(breakIn,'00:00') > 0) lateMsgs.push('Late from Break');
+  // Compare times helper
+  function compareTime(t1, t2) {
+    if (!t1 || !t2) return 0;
+    const [h1, m1] = t1.split(":").map(Number);
+    const [h2, m2] = t2.split(":").map(Number);
+    return (h1*60 + m1) - (h2*60 + m2);
   }
-  const status = lateMsgs.length === 0 ? `${shift} - Present` : `${shift} - ${lateMsgs.join(' & ')}`;
-  return {status, shift};
-}
 
-/* generate HTML table (email body) from Firebase object */
-function generateEmailTableFromObject(dataObj){
-  let rows = '';
-  const names = Object.keys(dataObj || {}).sort((a,b)=>a.localeCompare(b));
-  names.forEach(name=>{
-    const d = dataObj[name] || {};
-    rows += `<tr>
-      <td style="padding:8px;border:1px solid #ddd;">${escapeHtml(name)}</td>
-      <td style="padding:8px;border:1px solid #ddd;">${d.timeIn || '-'}</td>
-      <td style="padding:8px;border:1px solid #ddd;">${d.timeOut || '-'}</td>
-      <td style="padding:8px;border:1px solid #ddd;">${d.breakOut || '-'}</td>
-      <td style="padding:8px;border:1px solid #ddd;">${d.breakIn || '-'}</td>
-      <td style="padding:8px;border:1px solid #ddd;">${d.shift ? d.shift + (d.status && d.status.includes(' - ') ? ' — ' + d.status.split(' - ')[1] : '') : (d.status || '-')}</td>
-    </tr>`;
-  });
-  return `<table style="width:100%;border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;">
-    <thead><tr style="background:#f6f6f6"><th style="text-align:left;padding:8px;border:1px solid #ddd;">Name</th><th style="text-align:left;padding:8px;border:1px solid #ddd;">Time In</th><th style="text-align:left;padding:8px;border:1px solid #ddd;">Time Out</th><th style="text-align:left;padding:8px;border:1px solid #ddd;">Break Out</th><th style="text-align:left;padding:8px;border:1px solid #ddd;">Break In</th><th style="text-align:left;padding:8px;border:1px solid #ddd;">Shift/Status</th></tr></thead><tbody>${rows}</tbody></table>`;
-}
-
-/* ===== UI wiring ===== */
-const tbody = document.querySelector('#attendance-table tbody');
-document.getElementById('current-date').textContent = todayStr();
-const summaryOutput = document.getElementById('summary-output');
-
-/* HARD-CODED initial staff list (your 33 names) */
-const initialStaffNames = [
-"Delight Vincent","Odekun Esther","Aribo Olufemi","Aluko joy","Awosanya Pelumi",
-"Temitayo Martins","Ibrahim Omotoyosi","Ouneyom Elizabeth","Otukelu Balikis","Olarenwaju Fattimo",
-"Kareem Muiz","Okeshola Segun","Misturah Disu","Idebe Lekan","Belewu Fathia",
-"Adegbenro Kudirat","Hussein Rosul","Shogbola Oluwaseun","Ogundowo Bose","Tiamiyu Adijat",
-"Adekunle Ronke","Anuoluwapo Joseph","Alabi Hassan","Adeshina Rashidat","Amudat Lawal",
-"Salvador Meminat","Lawal Dasola","Osinga Temitope","Sodiq Shukurat","Ogunlusi Felicia",
-"Afolabi Olawale","Iorhide Mariam","Adebayo Elijah"
-];
-
-/* Upload hard-coded names to today's path on first load (won't overwrite existing records) */
-function preloadInitialStaff(){
-  const baseRef = db.ref(`attendance/${todayStr()}`);
-  baseRef.once('value').then(snapshot=>{
-    const existing = snapshot.val() || {};
-    const updates = {};
-    initialStaffNames.forEach(n=>{
-      if(!existing[n]) {
-        updates[n] = { timeIn:'', timeOut:'', breakOut:'', breakIn:'', status:'', shift:'', locked:false };
-      }
-    });
-    if(Object.keys(updates).length) baseRef.update(updates);
-  });
-}
-preloadInitialStaff();
-
-/* Realtime listener — render table */
-const attendanceRef = db.ref(`attendance/${todayStr()}`);
-attendanceRef.on('value', snapshot => {
-  const data = snapshot.val() || {};
-  tbody.innerHTML = '';
-  Object.keys(data).sort((a,b)=>a.localeCompare(b)).forEach(name=>{
-    const rec = data[name] || {};
-    const tr = document.createElement('tr');
-    tr.setAttribute('data-name', name.toLowerCase());
-
-    const computed = computeStatus(rec);
-    const statusText = rec.status || computed.status || '';
-    const shift = rec.shift || computed.shift || (rec.timeIn ? detectShiftByTime(rec.timeIn) : null);
-
+  // Create table row for staff
+  function createStaffRow(name) {
+    const tr = document.createElement("tr");
+    tr.setAttribute("data-name", name.toLowerCase());
     tr.innerHTML = `
-      <td data-label="Name">${escapeHtml(name)}</td>
-      <td data-label="Time In"><input type="time" class="time-in" value="${rec.timeIn || ''}"></td>
-      <td data-label="Time Out"><input type="time" class="time-out" value="${rec.timeOut || ''}"></td>
-      <td data-label="Break Out"><input type="time" class="break-out" value="${rec.breakOut || ''}"></td>
-      <td data-label="Break In"><input type="time" class="break-in" value="${rec.breakIn || ''}"></td>
-      <td data-label="Status"><span class="status-badge ${shift === 'Morning' ? 'status-morning' : shift === 'Night' ? 'status-night' : 'status-none'}">${shift ? shift : (statusText || '')}</span></td>
+      <td>${name}</td>
+      <td><input type="time" class="time-in"></td>
+      <td><input type="time" class="time-out"></td>
+      <td><input type="time" class="break-out"></td>
+      <td><input type="time" class="break-in"></td>
+      <td>
+        <select class="status">
+          <option value="present">Present</option>
+          <option value="absent">Absent</option>
+          <option value="on-leave">On Leave</option>
+        </select>
+        <div class="status-message"></div>
+      </td>
+      <td><button class="remove-btn">Remove</button></td>
     `;
 
-    tbody.appendChild(tr);
-
-    const locked = !!rec.locked;
-    if(locked) tr.classList.add('locked');
-    tr.querySelectorAll('input').forEach(i => i.disabled = locked);
-
-    // Auto-save on change — no admin override
-    const timeInEl = tr.querySelector('.time-in');
-    const timeOutEl = tr.querySelector('.time-out');
-    const breakOutEl = tr.querySelector('.break-out');
-    const breakInEl = tr.querySelector('.break-in');
-
-    function saveRow(){
-      const newRec = {
-        timeIn: timeInEl.value || '',
-        timeOut: timeOutEl.value || '',
-        breakOut: breakOutEl.value || '',
-        breakIn: breakInEl.value || ''
-      };
-      const cs = computeStatus(newRec);
-      newRec.status = cs.status || '';
-      newRec.shift = cs.shift || (rec.shift || '');
-      // If timeIn is provided, lock the row until next day
-      if(newRec.timeIn) newRec.locked = true;
-      else newRec.locked = rec.locked || false;
-
-      db.ref(`attendance/${todayStr()}/${name}`).once('value').then(snap=>{
-        const existingRec = snap.val() || {};
-        // preserve existing locked flag (once locked stays locked until next day)
-        if(existingRec.locked) newRec.locked = true;
-        db.ref(`attendance/${todayStr()}/${name}`).set(Object.assign({}, existingRec, newRec));
-      });
-    }
-
-    [timeInEl, timeOutEl, breakOutEl, breakInEl].forEach(el=>{
-      el.addEventListener('change', saveRow);
-    });
-  });
-});
-
-/* Add staff (duplicate check) */
-document.getElementById('add-staff-btn').addEventListener('click', ()=>{
-  const name = document.getElementById('new-staff-name').value.trim();
-  if(!name) return alert('Enter a staff name.');
-  const ref = db.ref(`attendance/${todayStr()}/${name}`);
-  ref.once('value').then(snap=>{
-    if(snap.exists()){
-      alert(`⚠️ Staff '${name}' already exists today!`);
-    } else {
-      ref.set({timeIn:'',timeOut:'',breakOut:'',breakIn:'',status:'',shift:'',locked:false})
-         .then(()=>{ document.getElementById('new-staff-name').value=''; });
-    }
-  });
-});
-
-/* Remove staff (by name) */
-document.getElementById('remove-staff-btn').addEventListener('click', ()=>{
-  const name = document.getElementById('new-staff-name').value.trim();
-  if(!name) return alert('Enter staff name to remove.');
-  const ref = db.ref(`attendance/${todayStr()}/${name}`);
-  ref.once('value').then(snap=>{
-    if(!snap.exists()) return alert(`No staff '${name}' found today.`);
-    if(confirm(`Remove staff '${name}'? This deletes today's record.`)){
-      ref.remove();
-      document.getElementById('new-staff-name').value = '';
-    }
-  });
-});
-
-/* Search / Clear */
-document.getElementById('search-btn').addEventListener('click', ()=>{
-  const q = document.getElementById('search-name').value.trim().toLowerCase();
-  document.querySelectorAll('#attendance-table tbody tr').forEach(tr=>{
-    tr.style.display = tr.getAttribute('data-name').includes(q) ? '' : 'none';
-  });
-});
-document.getElementById('clear-search-btn').addEventListener('click', ()=>{
-  document.getElementById('search-name').value = '';
-  document.querySelectorAll('#attendance-table tbody tr').forEach(tr => tr.style.display = '');
-});
-
-/* Send summary as HTML table to email (silent auto-send at 07:00) */
-let lastSentDate = null;
-function sendSummaryForDate(dateStr, auto=false){
-  if(lastSentDate === dateStr) return;
-  db.ref(`attendance/${dateStr}`).once('value').then(snap=>{
-    const data = snap.val() || {};
-    if(Object.keys(data).length === 0) return;
-    const htmlTable = generateEmailTableFromObject(data);
-    emailjs.send("service_itxtkoc","template_mlh2ahf",{
-      to_email: "richieraphaels60@gmail.com",
-      date: dateStr,
-      summary_html: htmlTable
-    }).then(() => {
-      lastSentDate = dateStr;
-      // do NOT unlock rows after send — they remain locked until next day
-      db.ref('meta/lastSent').set({date: dateStr, time: new Date().toISOString()});
-      if(!auto) alert('Attendance summary sent for ' + dateStr);
-    }).catch(err=>{
-      console.error('EmailJS error', err);
-      if(!auto) alert('Failed to send email: '+JSON.stringify(err));
-    });
-  });
-}
-document.getElementById('check-attendance').addEventListener('click', ()=> sendSummaryForDate(todayStr(), false));
-
-/* Background automation (every 20s) */
-setInterval(() => {
-  const now = new Date();
-  const hh = now.getHours(), mm = now.getMinutes();
-  const dateNow = todayStr();
-
-  // Auto-send at 07:00 (silent, once per day)
-  if(hh === 7 && mm === 0){
-    db.ref('meta/lastSent').once('value').then(snap => {
-      const last = snap.val();
-      if(!last || last.date !== dateNow){
-        sendSummaryForDate(dateNow, true);
+    tr.querySelector(".remove-btn").addEventListener("click", () => {
+      if(confirm(`Remove ${name}?`)){
+        onValue(staffRef, (snapshot) => {
+          const staffObj = snapshot.val() || {};
+          for (const key in staffObj) {
+            if (staffObj[key].toLowerCase() === name.toLowerCase()) {
+              remove(ref(db, "staff/" + key));
+              break;
+            }
+          }
+        }, { onlyOnce: true });
       }
     });
+
+    return tr;
   }
 
-  // Auto-absent at 07:10 (morning) and 17:10 (night)
-  if((hh === 7 && mm === 10) || (hh === 17 && mm === 10)){
-    const cutoffType = (hh === 7 && mm === 10) ? 'Morning' : 'Night';
-    db.ref(`attendance/${dateNow}`).once('value').then(snap=>{
-      const data = snap.val() || {};
-      const updates = {};
-      Object.entries(data).forEach(([name, rec])=>{
-        const hasTimeIn = rec && rec.timeIn;
-        const locked = rec && rec.locked;
-        if(!hasTimeIn && !locked){
-          updates[`${name}/status`] = 'Absent';
-          updates[`${name}/locked`] = true;
-          updates[`${name}/shift`] = cutoffType;
+  // Populate staff table
+  function populateStaffTable(names) {
+    const tbody = document.querySelector("#attendance-table tbody");
+    tbody.innerHTML = "";
+    names.forEach(name => tbody.appendChild(createStaffRow(name)));
+  }
+
+  // Load staff in real-time from Firebase
+  onValue(staffRef, (snapshot) => {
+    if(snapshot.exists()){
+      const staffObj = snapshot.val();
+      const names = Object.values(staffObj).sort((a,b)=>a.localeCompare(b));
+      populateStaffTable(names);
+    }
+  });
+
+  // Add staff button
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("add-staff-btn").addEventListener("click", () => {
+      const newNameInput = document.getElementById("new-staff-name");
+      const newName = newNameInput.value.trim();
+      if(!newName) return alert("Enter staff name");
+
+      onValue(staffRef, (snapshot)=>{
+        const staffObj = snapshot.val()||{};
+        const existing = Object.values(staffObj).map(n=>n.toLowerCase());
+        if(existing.includes(newName.toLowerCase())){
+          alert("Staff already exists!");
+        } else {
+          set(push(staffRef), newName);
+          newNameInput.value = "";
         }
-      });
-      if(Object.keys(updates).length) db.ref(`attendance/${dateNow}`).update(updates);
+      }, { onlyOnce:true });
+    });
+  });
+
+  // Auto-set timeOut and check status
+  function updateStatus() {
+    const now = new Date();
+    const rows = document.querySelectorAll("#attendance-table tbody tr");
+    rows.forEach(row=>{
+      const timeIn = row.querySelector(".time-in");
+      const timeOut = row.querySelector(".time-out");
+      const breakOut = row.querySelector(".break-out");
+      const breakIn = row.querySelector(".break-in");
+      const statusSelect = row.querySelector(".status");
+      const statusMsgDiv = row.querySelector(".status-message");
+
+      let status = statusSelect.value;
+      let statusMsg="", statusClass="";
+
+      // Determine shift
+      const h = now.getHours();
+      let shift = "day";
+      if(h>=17 || h<7) shift="night";
+
+      // Auto timeOut for previous shift
+      if(shift==="day" && h===7 && !timeOut.value) timeOut.value="07:00"; // night ends
+      if(shift==="night" && h===17 && !timeOut.value) timeOut.value="17:00"; // day ends
+
+      // Lateness logic
+      let lateMessages = [];
+      if(timeIn.value){
+        if(shift==="day" && (compareTime(timeIn.value,"07:00")<0 || compareTime(timeIn.value,"07:10")>0)) lateMessages.push("Late to Work");
+        if(shift==="night" && (compareTime(timeIn.value,"17:00")<0 || compareTime(timeIn.value,"17:10")>0)) lateMessages.push("Late to Work");
+      } else if(status==="present") { statusMsg="Absent"; statusClass="status-absent"; }
+
+      if(breakOut.value){
+        if(shift==="day" && (compareTime(breakOut.value,"11:00")<0 || compareTime(breakOut.value,"12:00")>0)) lateMessages.push("Late to Break");
+        if(shift==="night" && (compareTime(breakOut.value,"23:00")<0 || compareTime(breakOut.value,"00:00")>0)) lateMessages.push("Late to Break");
+      }
+      if(breakIn.value){
+        if(shift==="day" && compareTime(breakIn.value,"12:00")>0) lateMessages.push("Late from Break");
+        if(shift==="night" && compareTime(breakIn.value,"00:00")>0) lateMessages.push("Late from Break");
+      }
+
+      if(!statusMsg){
+        if(lateMessages.length===0){ statusMsg="Present"; statusClass="status-present"; }
+        else if(lateMessages.length===1){ statusMsg=lateMessages[0]; statusClass="status-late"; }
+        else{ statusMsg=lateMessages.join(" & "); statusClass="status-multi-late"; }
+      }
+
+      statusMsgDiv.textContent=statusMsg;
+      statusMsgDiv.className=`status-message ${statusClass}`;
     });
   }
 
-  // Auto-timeout at 17:00 for morning
-  if(hh === 17 && mm === 0){
-    db.ref(`attendance/${dateNow}`).once('value').then(snap=>{
-      const data = snap.val() || {};
-      const updates = {};
-      Object.entries(data).forEach(([name, rec])=>{
-        const shift = rec && rec.shift ? rec.shift : detectShiftByTime(rec && rec.timeIn);
-        if(shift === 'Morning' && (!rec.timeOut || rec.timeOut === '')){
-          updates[`${name}/timeOut`] = '17:00';
-        }
+  // Auto-send summary
+  function sendSummary() {
+    if(emailSentToday) return;
+    const rows = document.querySelectorAll("#attendance-table tbody tr");
+    if(rows.length===0) return;
+    let summaryData=[];
+    rows.forEach(row=>{
+      summaryData.push({
+        name: row.cells[0].textContent,
+        timeIn: row.querySelector(".time-in").value||"-",
+        timeOut: row.querySelector(".time-out").value||"-",
+        breakOut: row.querySelector(".break-out").value||"-",
+        breakIn: row.querySelector(".break-in").value||"-",
+        status: row.querySelector(".status-message").textContent||row.querySelector(".status").value
       });
-      if(Object.keys(updates).length) db.ref(`attendance/${dateNow}`).update(updates);
     });
+
+    let tableHTML=`<table border="1" cellspacing="0" cellpadding="5"><thead><tr>
+      <th>Name</th><th>Time In</th><th>Time Out</th>
+      <th>Break Out</th><th>Break In</th><th>Status</th>
+    </tr></thead><tbody>`;
+
+    summaryData.forEach(item=>{
+      tableHTML+=`<tr>
+        <td>${item.name}</td><td>${item.timeIn}</td><td>${item.timeOut}</td>
+        <td>${item.breakOut}</td><td>${item.breakIn}</td><td>${item.status}</td>
+      </tr>`;
+    });
+    tableHTML+="</tbody></table>";
+
+    const today=new Date().toISOString().split("T")[0];
+    emailjs.send("service_itxtkoc","template_mlh2ahf",{
+      to_email:"richieraphaels60@gmail.com",
+      date:today,
+      summary:tableHTML
+    }).then(()=>{ emailSentToday=true; console.log("Email sent"); })
+    .catch(err=>console.error("Email error",err));
   }
 
-  // Auto-timeout at 07:00 for night
-  if(hh === 7 && mm === 0){
-    db.ref(`attendance/${dateNow}`).once('value').then(snap=>{
-      const data = snap.val() || {};
-      const updates = {};
-      Object.entries(data).forEach(([name, rec])=>{
-        const shift = rec && rec.shift ? rec.shift : detectShiftByTime(rec && rec.timeIn);
-        if(shift === 'Night' && (!rec.timeOut || rec.timeOut === '')){
-          updates[`${name}/timeOut`] = '07:00';
-        }
-      });
-      if(Object.keys(updates).length) db.ref(`attendance/${dateNow}`).update(updates);
-    });
-  }
-
-}, 20000); // every 20s
-
+  // Auto update every minute
+  setInterval(()=>{
+    updateStatus();
+    const now=new Date();
+    if((now.getHours()===7 || now.getHours()===17) && now.getMinutes()===0) sendSummary();
+  },60000);
 </script>
+
+<style>
+  body { font-family:Arial,sans-serif; background:#f7f7fa; margin:0; padding:2em; }
+  h1 { text-align:center; color:#333; }
+  table { width:100%; border-collapse:collapse; background:#fff; margin:1em auto; }
+  th,td { padding:0.6em; border:1px solid #ddd; text-align:center; }
+  th { background:#4f8ef7; color:#fff; }
+  button { margin:0.3em; padding:0.4em 1em; border:none; border-radius:5px; background:#4f8ef7; color:#fff; cursor:pointer; }
+  button:hover { background:#3563b7; }
+  input, select { padding:0.3em; border:1px solid #ccc; border-radius:4px; }
+  #add-staff-section { background:#fff; padding:1em; margin:1em auto; max-width:500px; border-radius:10px; text-align:center; }
+  .remove-btn { background:#e74c3c; color:white; padding:0.3em 0.8em; border:none; border-radius:5px; cursor:pointer; }
+  .remove-btn:hover { background:#c0392b; }
+  @media (max-width:768px){ table, th, td{ font-size:0.8em; } button{ font-size:0.9em; } }
+</style>
+</head>
+<body>
+  <h1>MEDITRACK LIMITED Attendance</h1>
+  <div id="add-staff-section">
+    <input type="text" id="new-staff-name" placeholder="Enter new staff name">
+    <button id="add-staff-btn">Add Staff</button>
+  </div>
+
+  <table id="attendance-table">
+    <thead>
+      <tr>
+        <th>Name</th><th>Time In</th><th>Time Out</th>
+        <th>Break Out</th><th>Break In</th><th>Status</th><th>Remove</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 </body>
 </html>
