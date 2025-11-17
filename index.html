@@ -2,201 +2,284 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Attendance System</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MEDITRACK LIMITED Attendance System</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- jsPDF + autoTable CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
 <style>
-body{font-family:Arial;margin:0;background:#f3f3f3;}
-header{background:#0d6efd;color:#fff;padding:15px;font-size:20px;text-align:center;}
-.container{padding:15px;}
-.card{background:#fff;padding:15px;margin-bottom:15px;border-radius:8px;box-shadow:0 0 5px #ccc;}
-input,select,button{width:100%;padding:10px;margin:5px 0;border-radius:6px;border:1px solid #ccc;}
-button{background:#0d6efd;color:#fff;border:none;font-weight:bold;cursor:pointer;}
-table{width:100%;border-collapse:collapse;margin-top:10px;}
-th,td{border:1px solid #ccc;padding:8px;text-align:left;}
-th{background:#e9ecef;}
-.role-tag{padding:2px 6px;border-radius:4px;font-size:12px;}
-.staff{background:#d1e7dd;color:#0f5132;}
-.supervisor{background:#cff4fc;color:#055160;}
-.security{background:#fde2e4;color:#b02a37;}
-.shift-box{padding:5px;background:#f8f9fa;border:1px solid #ddd;border-radius:5px;margin-top:5px;}
-.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:10px;}
-.day{background:#fff;border:1px solid #ddd;padding:10px;height:80px;cursor:pointer;border-radius:5px;font-size:12px;}
-.day.assigned{background:#dbeafe;}
+body { font-family: Arial, sans-serif; background: #f7f7fa; margin: 0; padding: 1em; }
+h1, h2 { text-align: center; color: #333; }
+button { margin: 0.5em auto; padding: 0.6em 1.2em; background: #4f8ef7; color: #fff; border: none; border-radius: 6px; font-size: 1em; cursor: pointer; display: inline-block; }
+button:hover { background: #3563b7; }
+input, select { padding: 0.4em; margin: 0.3em 0; border-radius: 4px; border: 1px solid #ccc; font-size: 0.9em; width: 100%; max-width: 250px; display: block; margin-left:auto; margin-right:auto; }
+#login-section, #attendance-section { max-width: 900px; margin: 2em auto; background: #fff; padding: 1em 2em; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+.table-container { width: 100%; overflow-x: auto; margin-top: 1em; }
+table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+th, td { padding: 0.5em; text-align: center; border-bottom: 1px solid #ececec; }
+th { background: #4f8ef7; color: #fff; }
+.status-message { font-weight: bold; padding: 0.2em; border-radius: 4px; margin-top: 3px; font-size: 0.8em; }
+.status-present { background: #e6ffe6; color: #1e7e34; }
+.status-absent { background: #ffe6e6; color: #c82333; }
+.status-on-leave { background: #e6f7ff; color: #005cbf; }
+.status-late, .status-late-break { background: #fffbe6; color: #d35400; }
 </style>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+import { getFirestore, collection, doc, getDoc, setDoc, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+
+// Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyBUldDoEEjByUVqsu8tbOR128GGLTrgE1Q",
+  authDomain: "med-attendance-2025.firebaseapp.com",
+  databaseURL: "https://med-attendance-2025-default-rtdb.firebaseio.com",
+  projectId: "med-attendance-2025",
+  storageBucket: "med-attendance-2025.firebasestorage.app",
+  messagingSenderId: "1044593504616",
+  appId: "1:1044593504616:web:b11e2126f577a76bdca6dd"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// Facility and Role Credentials
+const facilities = {
+  "General Hospital": { facilityPass: "admin1", janitorPass: "admin1", securityPass: "admin2" },
+  "LASUCOM": { facilityPass: "admin2", janitorPass: "admin1", securityPass: "admin2" }
+};
+
+// Global state
+let currentFacility = null;
+let currentRole = null;
+
+// Show login page
+window.onload = ()=>{
+  document.getElementById('login-section').style.display='block';
+  document.getElementById('attendance-section').style.display='none';
+};
+
+// Login Flow
+document.getElementById('facility-next').addEventListener('click', ()=>{
+  const facility = document.getElementById('facility-select').value;
+  const facilityPass = document.getElementById('facility-password').value;
+  if(!facility || !facilityPass) return alert('Select facility and enter password');
+  if(facilityPass!==facilities[facility].facilityPass) return alert('Incorrect facility password');
+  currentFacility = facility;
+  document.getElementById('role-section').style.display='block';
+  document.getElementById('facility-section').style.display='none';
+});
+
+// Role selection
+document.getElementById('role-next').addEventListener('click', ()=>{
+  const role = document.getElementById('role-select').value;
+  const rolePass = document.getElementById('role-password').value;
+  if(!role || !rolePass) return alert('Select role and enter password');
+  const correctPass = role==='Janitor'? facilities[currentFacility].janitorPass : facilities[currentFacility].securityPass;
+  if(rolePass!==correctPass) return alert('Incorrect role password');
+  currentRole = role;
+  // Hide login and show attendance section
+  document.getElementById('login-section').style.display='none';
+  document.getElementById('attendance-section').style.display='block';
+  document.getElementById('attendance-title').textContent = `${currentFacility} - ${currentRole} Attendance`;
+  loadStaff(); // Load staff table after login
+});
+
+// Dummy function placeholder for attendance table
+async function loadStaff() {
+  // Part 2 will contain full attendance table logic with Firestore integration
+  document.getElementById('attendance-table').innerHTML='<tr><td colspan="8">Attendance table will load here...</td></tr>';
+}
+</script>
 </head>
+
 <body>
-<header>Fingerprint Attendance & Shift Manager</header>
+<h1>MEDITRACK LIMITED</h1>
 
-<div class="container">
+<div id="login-section">
+  <div id="facility-section">
+    <h2>Select Facility</h2>
+    <select id="facility-select">
+      <option value="">--Select Facility--</option>
+      <option value="General Hospital">General Hospital</option>
+      <option value="LASUCOM">LASUCOM</option>
+    </select>
+    <input type="password" id="facility-password" placeholder="Enter Facility Password">
+    <button id="facility-next">Next</button>
+  </div>
 
-<div class="card">
-<h3>Register Staff</h3>
-<input id="name" placeholder="Full Name">
-<select id="role">
-<option value="staff">Staff</option>
-<option value="supervisor">Supervisor</option>
-<option value="security">Security</option>
-</select>
-<button onclick="addUser()">Add User</button>
+  <div id="role-section" style="display:none;">
+    <h2>Select Role</h2>
+    <select id="role-select">
+      <option value="">--Select Role--</option>
+      <option value="Janitor">Janitor</option>
+      <option value="Security">Security</option>
+    </select>
+    <input type="password" id="role-password" placeholder="Enter Role Password">
+    <button id="role-next">Login</button>
+  </div>
 </div>
 
-<div class="card">
-<h3>Registered Users</h3>
-<table id="usersTable">
-<tr><th>Name</th><th>Role</th></tr>
-</table>
+<div id="attendance-section">
+  <h2 id="attendance-title">Attendance</h2>
+  <div class="table-container">
+    <table id="attendance-table">
+      <thead>
+        <tr>
+          <th>Name</th><th>Shift</th><th>Time In</th><th>Time Out</th><th>Break Out</th><th>Break In</th><th>Status</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Staff rows will populate here -->
+      </tbody>
+    </table>
+  </div>
 </div>
+<script type="module">
+// Firebase already initialized in Part 1
 
-<div class="card">
-<h3>Mark Attendance (Fingerprint)</h3>
-<select id="attUser"></select>
-<button onclick="markAttendance()">Scan Fingerprint</button>
-
-<table id="attendanceTable">
-<tr><th>Name</th><th>Role</th><th>Date</th><th>Time</th></tr>
-</table>
-</div>
-
-<div class="card">
-<h3>Shift Manager</h3>
-<p>Select a user and assign days on the calendar.</p>
-<select id="shiftUser"></select>
-<div id="calendar" class="calendar-grid"></div>
-<h4>Assigned Shifts</h4>
-<div id="shiftList"></div>
-</div>
-
-</div>
-
-<script>
-let users = JSON.parse(localStorage.getItem("users")||"[]");
-let attendance = JSON.parse(localStorage.getItem("attendance")||"[]");
-let shifts = JSON.parse(localStorage.getItem("shifts")||"{}");
-
-function save(){localStorage.setItem("users",JSON.stringify(users));
-localStorage.setItem("attendance",JSON.stringify(attendance));
-localStorage.setItem("shifts",JSON.stringify(shifts));}
-
-function renderUsers(){
-let t=document.getElementById("usersTable");
-t.innerHTML="<tr><th>Name</th><th>Role</th></tr>";
-users.forEach(u=>{
-t.innerHTML+=`<tr><td>${u.name}</td><td><span class="role-tag ${u.role}">${u.role}</span></td></tr>`;
-});
-document.getElementById("attUser").innerHTML = 
-users.map(u=>`<option>${u.name}</option>`).join("");
-document.getElementById("shiftUser").innerHTML = 
-users.map(u=>`<option>${u.name}</option>`).join("");
-}
-renderUsers();
-
-function addUser(){
-let n=document.getElementById("name").value.trim();
-let r=document.getElementById("role").value;
-if(!n)return alert("Enter name");
-users.push({name:n,role:r});
-save();renderUsers();document.getElementById("name").value="";
+// Admin PIN auto-set and verification
+async function ensureAdminPIN() {
+  const adminRef = doc(db, 'settings', 'admin');
+  const snap = await getDoc(adminRef);
+  if (!snap.exists()) await setDoc(adminRef, { pin: "admin" });
 }
 
-function markAttendance(){
-let n=document.getElementById("attUser").value;
-let u=users.find(x=>x.name===n);
-let now=new Date();
-attendance.push({
-name:n,role:u.role,
-date:now.toDateString(),
-time:now.toLocaleTimeString()
-});
-save();renderAttendance();
+async function verifyAdminPIN() {
+  await ensureAdminPIN();
+  const snap = await getDoc(doc(db,'settings','admin'));
+  const pin = snap.data().pin;
+  const input = prompt("Enter Admin PIN:");
+  if(input===null) return false;
+  if(input!==pin){ alert("Incorrect PIN!"); return false; }
+  return true;
 }
 
-function renderAttendance(){
-let t=document.getElementById("attendanceTable");
-t.innerHTML=`<tr><th>Name</th><th>Role</th><th>Date</th><th>Time</th></tr>`;
-attendance.forEach(a=>{
-t.innerHTML+=`
-<tr><td>${a.name}</td><td><span class="role-tag ${a.role}">${a.role}</span></td>
-<td>${a.date}</td><td>${a.time}</td></tr>`;
-});
-}
-renderAttendance();
+// Firestore collections
+const attendanceCol = collection(db, 'attendance');
+const supervisorsCol = collection(db, 'supervisors');
+const summariesCol = collection(db, 'summaries');
 
-// ----- CALENDAR -----
-function buildCalendar(){
-let c=document.getElementById("calendar");
-c.innerHTML="";
-let days=30;
-for(let i=1;i<=days;i++){
-let d=document.createElement("div");
-d.className="day";
-d.innerHTML=i;
-d.onclick=()=>assignShift(i);
-c.appendChild(d);
-}
-}
-buildCalendar();
-function assignShift(day){
-let sel=document.getElementById("shiftUser").value;
-if(!sel)return alert("Select a user");
-if(!shifts[sel])shifts[sel]=[];
-if(shifts[sel].includes(day)){
-shifts[sel]=shifts[sel].filter(d=>d!==day);
-}else{
-shifts[sel].push(day);
-}
-save();renderShifts();
-renderCalendarHighlight();
-}
-
-function renderShifts(){
-let div=document.getElementById("shiftList");
-div.innerHTML="";
-for(let u in shifts){
-div.innerHTML+=`<div><b>${u}</b>: ${shifts[u].join(", ")}</div>`;
-}
+// Helper: create staff row
+function createStaffRow(name) {
+  const tr = document.createElement('tr');
+  tr.setAttribute('data-name', name.toLowerCase());
+  tr.innerHTML = `
+    <td>${name}</td>
+    <td>
+      <select class="shift">
+        <option value="Morning">Morning</option>
+        <option value="Night">Night</option>
+        <option value="Off">Off</option>
+      </select>
+    </td>
+    <td><input type="time" class="time-in"></td>
+    <td><input type="time" class="time-out"></td>
+    <td><input type="time" class="break-out"></td>
+    <td><input type="time" class="break-in"></td>
+    <td>
+      <select class="status">
+        <option value="Present">Present</option>
+        <option value="Absent">Absent</option>
+        <option value="On Leave">On Leave</option>
+      </select>
+      <div class="status-message"></div>
+    </td>
+    <td><button class="delete-staff-btn">Delete</button></td>
+  `;
+  tr.querySelector('.delete-staff-btn').addEventListener('click', async ()=>{
+    if(!(await verifyAdminPIN())) return;
+    const snap = await getDocs(attendanceCol);
+    snap.forEach(async docSnap=>{
+      if(docSnap.data().name === name) await setDoc(doc(db,'attendance',docSnap.id), {});
+    });
+    tr.remove();
+  });
+  return tr;
 }
 
-function renderCalendarHighlight(){
-let sel=document.getElementById("shiftUser").value;
-document.querySelectorAll("#calendar .day").forEach(d=>{
-let day=parseInt(d.innerHTML);
-if(shifts[sel]&&shifts[sel].includes(day)){
-d.classList.add("assigned");
-}else{
-d.classList.remove("assigned");
-}
-});
+// Load staff from Firestore
+async function loadStaff() {
+  const tbody = document.querySelector('#attendance-table tbody');
+  tbody.innerHTML = '';
+  const snap = await getDocs(attendanceCol);
+  snap.forEach(docSnap => {
+    const data = docSnap.data();
+    if(data.name) tbody.appendChild(createStaffRow(data.name));
+  });
 }
 
-document.getElementById("shiftUser").addEventListener("change",()=>{
-renderCalendarHighlight();
-renderShifts();
+// Add staff button
+const addStaffDiv = document.createElement('div');
+addStaffDiv.innerHTML = `
+  <input type="text" id="new-staff-name" placeholder="Enter new staff name">
+  <button id="add-staff-btn">Add Staff</button>
+`;
+document.getElementById('attendance-section').prepend(addStaffDiv);
+
+document.getElementById('add-staff-btn').addEventListener('click', async ()=>{
+  if(!(await verifyAdminPIN())) return;
+  const nameInput = document.getElementById('new-staff-name');
+  const name = nameInput.value.trim();
+  if(!name) return alert('Enter staff name');
+  await addDoc(attendanceCol, { name, facility: currentFacility, role: currentRole });
+  nameInput.value = '';
+  loadStaff();
 });
 
-// ----- INITIAL RENDER -----
-renderShifts();
-renderCalendarHighlight();
+// Save Attendance
+const saveBtn = document.createElement('button');
+saveBtn.textContent = 'Save Attendance';
+document.getElementById('attendance-section').appendChild(saveBtn);
 
-// ----- EXPORT ATTENDANCE TO PDF -----
-function downloadAttendancePDF(){
-let s = window.open('','_blank');
-s.document.write("<html><head><title>Attendance</title></head><body>");
-s.document.write("<h2>Attendance Records</h2>");
-s.document.write("<table border='1'><tr><th>Name</th><th>Role</th><th>Date</th><th>Time</th></tr>");
-attendance.forEach(a=>{
-s.document.write(`<tr><td>${a.name}</td><td>${a.role}</td><td>${a.date}</td><td>${a.time}</td></tr>`);
+saveBtn.addEventListener('click', async ()=>{
+  const rows = document.querySelectorAll('#attendance-table tbody tr');
+  let summaryData = [];
+  rows.forEach(row=>{
+    if(row.style.display==='none') return;
+    const name = row.cells[0].textContent;
+    const shift = row.querySelector('.shift').value;
+    const timeIn = row.querySelector('.time-in').value;
+    const timeOut = row.querySelector('.time-out').value;
+    const breakOut = row.querySelector('.break-out').value;
+    const breakIn = row.querySelector('.break-in').value;
+    const status = row.querySelector('.status').value;
+    row.querySelector('.status-message').textContent = status;
+    summaryData.push({name, shift, timeIn, timeOut, breakOut, breakIn, status});
+  });
+  const dateStr = new Date().toISOString().split('T')[0];
+  await setDoc(doc(db,'summaries',`${currentFacility}_${currentRole}_${dateStr}`), {data:summaryData});
+  alert('Attendance saved!');
 });
-s.document.write("</table></body></html>");
-s.document.close();
-s.print();
-}
 
-// Add button dynamically
-let btn=document.createElement("button");
-btn.textContent="Download Attendance PDF";
-btn.style.margin="10px 0";
-btn.onclick=downloadAttendancePDF;
-document.body.insertBefore(btn,document.body.firstChild);
+// PDF Download
+const downloadPDFBtn = document.createElement('button');
+downloadPDFBtn.textContent = 'Download PDF';
+document.getElementById('attendance-section').appendChild(downloadPDFBtn);
+
+downloadPDFBtn.addEventListener('click', async ()=>{
+  const dateStr = new Date().toISOString().split('T')[0];
+  const snap = await getDoc(doc(db,'summaries',`${currentFacility}_${currentRole}_${dateStr}`));
+  if(!snap.exists()) return alert('No attendance for today');
+  const summaryData = snap.data().data;
+  const { jsPDF } = window.jspdf;
+  const docPDF = new jsPDF();
+  docPDF.setFontSize(14);
+  docPDF.text(`${currentFacility} - ${currentRole} Attendance`, 14, 15);
+  docPDF.setFontSize(11);
+  const tableColumn = ["Name","Shift","Time In","Time Out","Break Out","Break In","Status"];
+  const tableRows = summaryData.map(item=>[item.name, item.shift, item.timeIn||'-', item.timeOut||'-', item.breakOut||'-', item.breakIn||'-', item.status]);
+  docPDF.autoTable({startY:25, head:[tableColumn], body:tableRows, styles:{fontSize:10}});
+  docPDF.save(`${currentFacility}_${currentRole}_attendance.pdf`);
+});
+
+// Auto-load staff after login
+window.addEventListener('load', ()=>{
+  if(currentFacility && currentRole) loadStaff();
+});
 </script>
 </body>
 </html>
