@@ -56,98 +56,17 @@ const facilities = {
 let currentFacility = null;
 let currentRole = null;
 
-// Show login page
-window.onload = ()=>{
-  document.getElementById('login-section').style.display='block';
-  document.getElementById('attendance-section').style.display='none';
-};
+// Firestore collections
+const attendanceCol = collection(db, 'attendance');
+const supervisorsCol = collection(db, 'supervisors');
+const summariesCol = collection(db, 'summaries');
 
-// Login Flow
-document.getElementById('facility-next').addEventListener('click', ()=>{
-  const facility = document.getElementById('facility-select').value;
-  const facilityPass = document.getElementById('facility-password').value;
-  if(!facility || !facilityPass) return alert('Select facility and enter password');
-  if(facilityPass!==facilities[facility].facilityPass) return alert('Incorrect facility password');
-  currentFacility = facility;
-  document.getElementById('role-section').style.display='block';
-  document.getElementById('facility-section').style.display='none';
-});
-
-// Role selection
-document.getElementById('role-next').addEventListener('click', ()=>{
-  const role = document.getElementById('role-select').value;
-  const rolePass = document.getElementById('role-password').value;
-  if(!role || !rolePass) return alert('Select role and enter password');
-  const correctPass = role==='Janitor'? facilities[currentFacility].janitorPass : facilities[currentFacility].securityPass;
-  if(rolePass!==correctPass) return alert('Incorrect role password');
-  currentRole = role;
-  // Hide login and show attendance section
-  document.getElementById('login-section').style.display='none';
-  document.getElementById('attendance-section').style.display='block';
-  document.getElementById('attendance-title').textContent = `${currentFacility} - ${currentRole} Attendance`;
-  loadStaff(); // Load staff table after login
-});
-
-// Dummy function placeholder for attendance table
-async function loadStaff() {
-  // Part 2 will contain full attendance table logic with Firestore integration
-  document.getElementById('attendance-table').innerHTML='<tr><td colspan="8">Attendance table will load here...</td></tr>';
-}
-</script>
-</head>
-
-<body>
-<h1>MEDITRACK LIMITED</h1>
-
-<div id="login-section">
-  <div id="facility-section">
-    <h2>Select Facility</h2>
-    <select id="facility-select">
-      <option value="">--Select Facility--</option>
-      <option value="General Hospital">General Hospital</option>
-      <option value="LASUCOM">LASUCOM</option>
-    </select>
-    <input type="password" id="facility-password" placeholder="Enter Facility Password">
-    <button id="facility-next">Next</button>
-  </div>
-
-  <div id="role-section" style="display:none;">
-    <h2>Select Role</h2>
-    <select id="role-select">
-      <option value="">--Select Role--</option>
-      <option value="Janitor">Janitor</option>
-      <option value="Security">Security</option>
-    </select>
-    <input type="password" id="role-password" placeholder="Enter Role Password">
-    <button id="role-next">Login</button>
-  </div>
-</div>
-
-<div id="attendance-section">
-  <h2 id="attendance-title">Attendance</h2>
-  <div class="table-container">
-    <table id="attendance-table">
-      <thead>
-        <tr>
-          <th>Name</th><th>Shift</th><th>Time In</th><th>Time Out</th><th>Break Out</th><th>Break In</th><th>Status</th><th>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        <!-- Staff rows will populate here -->
-      </tbody>
-    </table>
-  </div>
-</div>
-<script type="module">
-// Firebase already initialized in Part 1
-
-// Admin PIN auto-set and verification
+// Admin PIN
 async function ensureAdminPIN() {
   const adminRef = doc(db, 'settings', 'admin');
   const snap = await getDoc(adminRef);
   if (!snap.exists()) await setDoc(adminRef, { pin: "admin" });
 }
-
 async function verifyAdminPIN() {
   await ensureAdminPIN();
   const snap = await getDoc(doc(db,'settings','admin'));
@@ -158,61 +77,79 @@ async function verifyAdminPIN() {
   return true;
 }
 
-// Firestore collections
-const attendanceCol = collection(db, 'attendance');
-const supervisorsCol = collection(db, 'supervisors');
-const summariesCol = collection(db, 'summaries');
+// Login flow
+window.onload = ()=>{
+  document.getElementById('login-section').style.display='block';
+  document.getElementById('attendance-section').style.display='none';
+};
 
-// Helper: create staff row
-function createStaffRow(name) {
-  const tr = document.createElement('tr');
-  tr.setAttribute('data-name', name.toLowerCase());
-  tr.innerHTML = `
-    <td>${name}</td>
-    <td>
-      <select class="shift">
-        <option value="Morning">Morning</option>
-        <option value="Night">Night</option>
-        <option value="Off">Off</option>
-      </select>
-    </td>
-    <td><input type="time" class="time-in"></td>
-    <td><input type="time" class="time-out"></td>
-    <td><input type="time" class="break-out"></td>
-    <td><input type="time" class="break-in"></td>
-    <td>
-      <select class="status">
-        <option value="Present">Present</option>
-        <option value="Absent">Absent</option>
-        <option value="On Leave">On Leave</option>
-      </select>
-      <div class="status-message"></div>
-    </td>
-    <td><button class="delete-staff-btn">Delete</button></td>
-  `;
-  tr.querySelector('.delete-staff-btn').addEventListener('click', async ()=>{
-    if(!(await verifyAdminPIN())) return;
-    const snap = await getDocs(attendanceCol);
-    snap.forEach(async docSnap=>{
-      if(docSnap.data().name === name) await setDoc(doc(db,'attendance',docSnap.id), {});
-    });
-    tr.remove();
-  });
-  return tr;
-}
+document.getElementById('facility-next').addEventListener('click', ()=>{
+  const facility = document.getElementById('facility-select').value;
+  const facilityPass = document.getElementById('facility-password').value;
+  if(!facility || !facilityPass) return alert('Select facility and enter password');
+  if(facilityPass!==facilities[facility].facilityPass) return alert('Incorrect facility password');
+  currentFacility = facility;
+  document.getElementById('role-section').style.display='block';
+  document.getElementById('facility-section').style.display='none';
+});
 
-// Load staff from Firestore
+document.getElementById('role-next').addEventListener('click', ()=>{
+  const role = document.getElementById('role-select').value;
+  const rolePass = document.getElementById('role-password').value;
+  if(!role || !rolePass) return alert('Select role and enter password');
+  const correctPass = role==='Janitor'? facilities[currentFacility].janitorPass : facilities[currentFacility].securityPass;
+  if(rolePass!==correctPass) return alert('Incorrect role password');
+  currentRole = role;
+  document.getElementById('login-section').style.display='none';
+  document.getElementById('attendance-section').style.display='block';
+  document.getElementById('attendance-title').textContent = `${currentFacility} - ${currentRole} Attendance`;
+  loadStaff();
+});
+
+// Load staff and display shifts
 async function loadStaff() {
   const tbody = document.querySelector('#attendance-table tbody');
   tbody.innerHTML = '';
   const snap = await getDocs(attendanceCol);
   snap.forEach(docSnap => {
     const data = docSnap.data();
-    if(data.name) tbody.appendChild(createStaffRow(data.name));
+    if(data.name && data.facility===currentFacility && data.role===currentRole){
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-name', data.name.toLowerCase());
+      tr.innerHTML = `
+        <td>${data.name}</td>
+        <td>
+          <select class="shift">
+            ${currentRole==='Janitor' 
+              ? '<option value="Morning">Morning</option><option value="Night">Night</option><option value="Off">Off</option>'
+              : '<option value="On">On</option><option value="Off">Off</option>'}
+          </select>
+        </td>
+        <td><input type="time" class="time-in"></td>
+        <td><input type="time" class="time-out"></td>
+        <td><input type="time" class="break-out"></td>
+        <td><input type="time" class="break-in"></td>
+        <td>
+          <select class="status">
+            <option value="Present">Present</option>
+            <option value="Absent">Absent</option>
+            <option value="On Leave">On Leave</option>
+          </select>
+          <div class="status-message"></div>
+        </td>
+        <td><button class="delete-staff-btn">Delete</button></td>
+      `;
+      tr.querySelector('.delete-staff-btn').addEventListener('click', async ()=>{
+        if(!(await verifyAdminPIN())) return;
+        await setDoc(doc(db,'attendance',docSnap.id), {});
+        tr.remove();
+      });
+      tbody.appendChild(tr);
+    }
   });
 }
 
-// Add staff button
+// Add Staff UI
 const addStaffDiv = document.createElement('div');
 addStaffDiv.innerHTML = `
   <input type="text" id="new-staff-name" placeholder="Enter new staff name">
@@ -275,11 +212,47 @@ downloadPDFBtn.addEventListener('click', async ()=>{
   docPDF.autoTable({startY:25, head:[tableColumn], body:tableRows, styles:{fontSize:10}});
   docPDF.save(`${currentFacility}_${currentRole}_attendance.pdf`);
 });
-
-// Auto-load staff after login
-window.addEventListener('load', ()=>{
-  if(currentFacility && currentRole) loadStaff();
-});
 </script>
+</head>
+<body>
+<h1>MEDITRACK LIMITED</h1>
+
+<div id="login-section">
+  <div id="facility-section">
+    <h2>Select Facility</h2>
+    <select id="facility-select">
+      <option value="">--Select Facility--</option>
+      <option value="General Hospital">General Hospital</option>
+      <option value="LASUCOM">LASUCOM</option>
+    </select>
+    <input type="password" id="facility-password" placeholder="Enter Facility Password">
+    <button id="facility-next">Next</button>
+  </div>
+
+  <div id="role-section" style="display:none;">
+    <h2>Select Role</h2>
+    <select id="role-select">
+      <option value="">--Select Role--</option>
+      <option value="Janitor">Janitor</option>
+      <option value="Security">Security</option>
+    </select>
+    <input type="password" id="role-password" placeholder="Enter Role Password">
+    <button id="role-next">Login</button>
+  </div>
+</div>
+
+<div id="attendance-section">
+  <h2 id="attendance-title">Attendance</h2>
+  <div class="table-container">
+    <table id="attendance-table">
+      <thead>
+        <tr>
+          <th>Name</th><th>Shift</th><th>Time In</th><th>Time Out</th><th>Break Out</th><th>Break In</th><th>Status</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
 </body>
 </html>
