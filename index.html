@@ -2,289 +2,312 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>MEDITRACK LIMITED Attendance System</title>
+<title>MEDITRACK LIMITED - General Hospital / LASUCOM</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<!-- jsPDF + autoTable CDN -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-
 <style>
-body { font-family: Arial, sans-serif; background: #f7f7fa; margin: 0; padding: 1em; }
-h1,h2 { text-align: center; color: #333; }
-button { margin: 0.5em auto; padding: 0.6em 1.2em; background: #4f8ef7; color: #fff; border: none; border-radius: 6px; font-size: 1em; cursor: pointer; display: inline-block; }
-button:hover { background: #3563b7; }
-input, select { padding: 0.4em; margin: 0.3em 0; border-radius: 4px; border: 1px solid #ccc; font-size: 0.9em; width: 100%; max-width: 250px; display: block; margin-left:auto; margin-right:auto; }
-#login-section, #attendance-section, .card { max-width: 900px; margin: 2em auto; background: #fff; padding: 1em 2em; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-.table-container { width: 100%; overflow-x: auto; margin-top: 1em; }
-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
-th, td { padding: 0.5em; text-align: center; border-bottom: 1px solid #ececec; }
-th { background: #4f8ef7; color: #fff; }
-.status-message { font-weight: bold; padding: 0.2em; border-radius: 4px; margin-top: 3px; font-size: 0.8em; }
-.status-present { background: #e6ffe6; color: #1e7e34; }
-.status-absent { background: #ffe6e6; color: #c82333; }
-.status-on-leave { background: #e6f7ff; color: #005cbf; }
-.status-late, .status-late-break { background: #fffbe6; color: #d35400; }
+  body { font-family: Arial, sans-serif; background: #f7f7fa; margin:0; padding:0; }
+  #login-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:center; z-index:999; }
+  #login-box { background:#fff; padding:20px; border-radius:8px; width:300px; text-align:center; }
+  input, select, button { margin:5px 0; padding:0.5em; width:90%; border-radius:4px; border:1px solid #ccc; font-size:0.9em; }
+  button { background:#4f8ef7; color:#fff; border:none; cursor:pointer; }
+  button:hover { background:#3563b7; }
+  #dashboard { position: fixed; top:0; left:0; width:220px; height:100%; background:#fff; border-right:1px solid #ccc; padding:10px; box-sizing:border-box; overflow-y:auto; }
+  #dashboard h3 { margin-top:0; }
+  #dashboard div { margin-bottom:10px; }
+  #attendance-section { margin-left:230px; padding:20px; }
+  table { width:100%; border-collapse: collapse; margin-top:10px; }
+  th, td { border:1px solid #ccc; padding:5px; text-align:center; }
+  th { background:#4f8ef7; color:#fff; }
+  .status-present { background:#e6ffe6; color:#1e7e34; }
+  .status-absent { background:#ffe6e6; color:#c82333; }
+  .status-on-leave { background:#e6f7ff; color:#005cbf; }
+  .status-late { background:#fffbe6; color:#d35400; }
+  #calendar { display:grid; grid-template-columns: repeat(7, 1fr); gap:5px; margin-top:10px; }
+  .day { border:1px solid #ccc; padding:5px; text-align:center; cursor:pointer; }
+  .assigned { background:#d3f7d3; }
 </style>
 </head>
 <body>
 
-<h1><img src="YOUR_LOGO_URL_HERE" alt="MEDITRACK LOGO" style="height:60px; vertical-align:middle;"> MEDITRACK LIMITED</h1>
-
-<div id="login-section">
-  <div id="facility-section">
-    <h2>Select Facility</h2>
+<!-- Login Overlay -->
+<div id="login-overlay">
+  <div id="login-box">
+    <h2>MEDITRACK LIMITED</h2>
+    <p>Select Facility:</p>
     <select id="facility-select">
       <option value="">--Select Facility--</option>
-      <option value="General Hospital">General Hospital</option>
-      <option value="LASUCOM">LASUCOM</option>
+      <option value="general">General Hospital</option>
+      <option value="lasucom">LASUCOM</option>
     </select>
-    <input type="password" id="facility-password" placeholder="Enter Facility Password">
-    <button id="facility-next">Next</button>
-  </div>
-
-  <div id="role-section" style="display:none;">
-    <h2>Select Role</h2>
-    <select id="role-select">
-      <option value="">--Select Role--</option>
-      <option value="Janitor">Janitor</option>
-      <option value="Security">Security</option>
+    <input type="password" id="facility-password" placeholder="Facility Password">
+    <p>Select Department:</p>
+    <select id="department-select">
+      <option value="">--Select Department--</option>
+      <option value="janitor">Janitor</option>
+      <option value="security">Security</option>
     </select>
-    <input type="password" id="role-password" placeholder="Enter Role Password">
-    <button id="role-next">Login</button>
+    <input type="password" id="department-password" placeholder="Department Password">
+    <button id="login-btn">Login</button>
+    <div id="login-msg" style="color:red; font-size:0.9em;"></div>
   </div>
 </div>
 
+<!-- Dashboard -->
+<div id="dashboard" style="display:none;">
+  <h3>Dashboard</h3>
+  <div><b>Facility:</b> <span id="dash-facility"></span></div>
+  <div><b>Department:</b> <span id="dash-department"></span></div>
+  <div><b>Supervisor:</b> <span id="dash-supervisor"></span></div>
+  <div><b>Total Staff:</b> <span id="dash-total"></span></div>
+  <div><b>Present:</b> <span id="dash-present"></span></div>
+  <div><b>Absent:</b> <span id="dash-absent"></span></div>
+  <div><b>Shift Editor (Admin Only)</b></div>
+  <select id="shiftUser"></select>
+  <div id="calendar"></div>
+  <input type="password" id="admin-shift-pass" placeholder="Admin Password">
+  <button id="assign-shift-btn">Assign/Remove Shift</button>
+</div>
+
+<!-- Attendance Section -->
 <div id="attendance-section" style="display:none;">
-  <h2 id="attendance-title">Attendance</h2>
+  <h2>Attendance List</h2>
+  <input type="text" id="new-staff-name" placeholder="Add Staff (Admin)">
+  <input type="password" id="admin-pass" placeholder="Admin Password">
+  <button id="add-staff-btn">Add Staff</button>
+  <button id="download-summary-btn">Download Attendance PDF</button>
 
-  <div class="card" id="supervisor-card">
-    <h3>Supervisor on Duty</h3>
-    <input type="text" id="supervisor-name" placeholder="Enter supervisor name">
-    <button id="save-supervisor">Save Supervisor</button>
-  </div>
-
-  <div class="card" id="add-staff-card">
-    <h3>Add Staff</h3>
-    <input type="text" id="new-staff-name" placeholder="Enter staff name">
-    <button id="add-staff-btn">Add Staff</button>
-  </div>
-
-  <div class="table-container">
-    <table id="attendance-table">
-      <thead>
-        <tr>
-          <th>Name</th><th>Shift</th><th>Time In</th><th>Time Out</th><th>Break Out</th><th>Break In</th><th>Status</th><th>Action</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
-
-  <button id="save-attendance-btn">Save Attendance</button>
-  <button id="download-today-pdf">Download Today's PDF</button>
-  <div class="card">
-    <h3>Download Multiple Days / Shifts PDF</h3>
-    <label>Start Date: <input type="date" id="start-date"></label>
-    <label>End Date: <input type="date" id="end-date"></label>
-    <button id="download-multi-pdf">Download PDF</button>
-  </div>
+  <table id="attendance-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Shift</th>
+        <th>Time In</th>
+        <th>Time Out</th>
+        <th>Status</th>
+        <th>Supervisor</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 </div>
 
+<script>
+const facilityPasswords = {general:"admin1", lasucom:"admin2"};
+const departmentPasswords = {janitor:"admin1", security:"admin2"};
+const adminPassword = "admin";
+
+let facility="", department="";
+let staffNames = [], attendance = [], supervisor = "";
+let shifts = {}; // {staffName: [day1,day2,...]}
+
+// ----- LOGIN -----
+document.getElementById("login-btn").addEventListener("click", ()=>{
+  const f = document.getElementById("facility-select").value;
+  const fpass = document.getElementById("facility-password").value;
+  const d = document.getElementById("department-select").value;
+  const dpass = document.getElementById("department-password").value;
+  const msg = document.getElementById("login-msg");
+
+  if(!f || !d){ msg.textContent="Select both facility and department"; return; }
+  if(fpass!==facilityPasswords[f]){ msg.textContent="Incorrect facility password"; return; }
+  if(dpass!==departmentPasswords[d]){ msg.textContent="Incorrect department password"; return; }
+
+  facility=f; department=d;
+  document.getElementById("login-overlay").style.display="none";
+  document.getElementById("dashboard").style.display="block";
+  document.getElementById("attendance-section").style.display="block";
+  document.getElementById("dash-facility").textContent = f==="general"?"General Hospital":"LASUCOM";
+  document.getElementById("dash-department").textContent = d.charAt(0).toUpperCase()+d.slice(1);
+
+  loadLocalState();
+  renderStaffTable();
+  renderDashboard();
+  renderCalendar();
+});
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-import { getFirestore, collection, doc, getDoc, setDoc, addDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+  // Firebase Setup
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+  import { getDatabase, ref, set, get, child, onValue } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
 
-// Firebase config
-const firebaseConfig = {
-  apiKey: "AIzaSyBUldDoEEjByUVqsu8tbOR128GGLTrgE1Q",
-  authDomain: "med-attendance-2025.firebaseapp.com",
-  databaseURL: "https://med-attendance-2025-default-rtdb.firebaseio.com",
-  projectId: "med-attendance-2025",
-  storageBucket: "med-attendance-2025.firebasestorage.app",
-  messagingSenderId: "1044593504616",
-  appId: "1:1044593504616:web:b11e2126f577a76bdca6dd"
-};
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
 
-// Facility & role credentials
-const facilities = {
-  "General Hospital": {facilityPass:"admin1", janitorPass:"admin1", securityPass:"admin2"},
-  "LASUCOM": {facilityPass:"admin2", janitorPass:"admin1", securityPass:"admin2"}
-};
+  // ----- Load Local State -----
+  function loadLocalState(){
+    const savedStaff = JSON.parse(localStorage.getItem(facility+"_"+department+"_staff")||"[]");
+    const savedAttendance = JSON.parse(localStorage.getItem(facility+"_"+department+"_attendance")||"[]");
+    const savedSupervisor = localStorage.getItem(facility+"_"+department+"_supervisor")||"";
+    const savedShifts = JSON.parse(localStorage.getItem(facility+"_"+department+"_shifts")||"{}");
 
-let currentFacility=null;
-let currentRole=null;
-let adminVerified=false;
-
-const attendanceCol = collection(db,'attendance');
-const supervisorsCol = collection(db,'supervisors');
-const summariesCol = collection(db,'summaries');
-
-async function ensureAdminPIN(){
-  const snap = await getDoc(doc(db,'settings','admin'));
-  if(!snap.exists()) await setDoc(doc(db,'settings','admin'),{pin:'admin'});
-}
-
-async function verifyAdminPIN(always=false){
-  await ensureAdminPIN();
-  if(adminVerified && !always) return true;
-  const snap = await getDoc(doc(db,'settings','admin'));
-  const pin = snap.data().pin;
-  const input = prompt("Enter Admin PIN:");
-  if(input===null) return false;
-  if(input!==pin){ alert("Incorrect PIN!"); return false; }
-  adminVerified=true;
-  return true;
-}
-
-// Login flow
-document.getElementById('facility-next').addEventListener('click',()=>{
-  const facility=document.getElementById('facility-select').value;
-  const pass=document.getElementById('facility-password').value;
-  if(!facility || !pass) return alert("Select facility & password");
-  if(pass!==facilities[facility].facilityPass) return alert("Incorrect facility password");
-  currentFacility=facility;
-  document.getElementById('facility-section').style.display='none';
-  document.getElementById('role-section').style.display='block';
-});
-
-document.getElementById('role-next').addEventListener('click',()=>{
-  const role=document.getElementById('role-select').value;
-  const pass=document.getElementById('role-password').value;
-  if(!role || !pass) return alert("Select role & password");
-  const correctPass=role==='Janitor'?facilities[currentFacility].janitorPass:facilities[currentFacility].securityPass;
-  if(pass!==correctPass) return alert("Incorrect role password");
-  currentRole=role;
-  document.getElementById('login-section').style.display='none';
-  document.getElementById('attendance-section').style.display='block';
-  document.getElementById('attendance-title').textContent=`${currentFacility} - ${currentRole} Attendance`;
-  loadStaff();
-});
-
-// Load Staff
-async function loadStaff(){
-  const tbody=document.querySelector('#attendance-table tbody');
-  tbody.innerHTML='';
-  const q=query(attendanceCol, where("facility","==",currentFacility), where("role","==",currentRole));
-  const snap=await getDocs(q);
-  snap.forEach(docSnap=>{
-    const data=docSnap.data();
-    const tr=document.createElement('tr');
-    tr.setAttribute('data-name',data.name.toLowerCase());
-    tr.innerHTML=`
-      <td>${data.name}</td>
-      <td>
-        <select class="shift">
-          ${currentRole==='Janitor'?'<option value="Morning">Morning</option><option value="Night">Night</option><option value="Off">Off</option>':'<option value="On">On</option><option value="Off">Off</option>'}
-        </select>
-      </td>
-      <td><input type="time" class="time-in"></td>
-      <td><input type="time" class="time-out"></td>
-      <td><input type="time" class="break-out"></td>
-      <td><input type="time" class="break-in"></td>
-      <td>
-        <select class="status">
-          <option value="Present">Present</option>
-          <option value="Absent">Absent</option>
-          <option value="On Leave">On Leave</option>
-        </select>
-        <div class="status-message"></div>
-      </td>
-      <td><button class="delete-staff-btn">Delete</button></td>
-    `;
-    tr.querySelector('.delete-staff-btn').addEventListener('click',async()=>{
-      if(!(await verifyAdminPIN())) return;
-      await setDoc(doc(db,'attendance',docSnap.id),{});
-      tr.remove();
-    });
-    tbody.appendChild(tr);
-  });
-}
-
-// Add Staff
-document.getElementById('add-staff-btn').addEventListener('click',async()=>{
-  if(!(await verifyAdminPIN())) return;
-  const name=document.getElementById('new-staff-name').value.trim();
-  if(!name) return alert("Enter staff name");
-  await addDoc(attendanceCol,{name,facility:currentFacility,role:currentRole});
-  document.getElementById('new-staff-name').value='';
-  loadStaff();
-});
-
-// Save Supervisor
-document.getElementById('save-supervisor').addEventListener('click',async()=>{
-  if(!(await verifyAdminPIN())) return;
-  const name=document.getElementById('supervisor-name').value.trim();
-  if(!name) return alert("Enter supervisor name");
-  await setDoc(doc(supervisorsCol,`${currentFacility}_${currentRole}`),{name});
-  alert("Supervisor saved!");
-});
-
-// Save Attendance (always ask PIN)
-document.getElementById('save-attendance-btn').addEventListener('click',async()=>{
-  if(!(await verifyAdminPIN(true))) return;
-  const rows=document.querySelectorAll('#attendance-table tbody tr');
-  const summaryData=[];
-  rows.forEach(row=>{
-    const name=row.cells[0].textContent;
-    const shift=row.querySelector('.shift').value;
-    const timeIn=row.querySelector('.time-in').value;
-    const timeOut=row.querySelector('.time-out').value;
-    const breakOut=row.querySelector('.break-out').value;
-    const breakIn=row.querySelector('.break-in').value;
-    const status=row.querySelector('.status').value;
-    row.querySelector('.status-message').textContent=status;
-    summaryData.push({name,shift,timeIn,timeOut,breakOut,breakIn,status});
-  });
-  const dateStr=new Date().toISOString().split('T')[0];
-  await setDoc(doc(summariesCol,`${currentFacility}_${currentRole}_${dateStr}`),{data:summaryData});
-  alert("Attendance saved!");
-});
-
-// Download Today's PDF
-document.getElementById('download-today-pdf').addEventListener('click',async()=>{
-  const dateStr=new Date().toISOString().split('T')[0];
-  const snap=await getDoc(doc(summariesCol,`${currentFacility}_${currentRole}_${dateStr}`));
-  if(!snap.exists()) return alert("No data for today");
-  const data=snap.data().data;
-  const { jsPDF } = window.jspdf;
-  const docPDF = new jsPDF();
-  docPDF.text(`${currentFacility} - ${currentRole} Attendance (${dateStr})`,14,15);
-  const tableRows=data.map(i=>[i.name,i.shift,i.timeIn||'-',i.timeOut||'-',i.breakOut||'-',i.breakIn||'-',i.status]);
-  docPDF.autoTable({startY:25, head:[["Name","Shift","Time In","Time Out","Break Out","Break In","Status"]],body:tableRows});
-  docPDF.save(`${currentFacility}_${currentRole}_${dateStr}.pdf`);
-});
-
-// Download multiple days PDF
-document.getElementById('download-multi-pdf').addEventListener('click',async()=>{
-  const start=document.getElementById('start-date').value;
-  const end=document.getElementById('end-date').value;
-  if(!start || !end) return alert("Select start and end date");
-  const { jsPDF } = window.jspdf;
-  const docPDF=new jsPDF();
-  docPDF.setFontSize(14);
-  let currentY=15;
-  let dateIter=new Date(start);
-  const endDate=new Date(end);
-  while(dateIter<=endDate){
-    const dateStr=dateIter.toISOString().split('T')[0];
-    const snap=await getDoc(doc(summariesCol,`${currentFacility}_${currentRole}_${dateStr}`));
-    if(snap.exists()){
-      const data=snap.data().data;
-      docPDF.setFontSize(12);
-      docPDF.text(`${currentFacility} - ${currentRole} Attendance (${dateStr})`,14,currentY);
-      currentY+=6;
-      const tableRows=data.map(i=>[i.name,i.shift,i.timeIn||'-',i.timeOut||'-',i.breakOut||'-',i.breakIn||'-',i.status]);
-      docPDF.autoTable({startY:currentY, head:[["Name","Shift","Time In","Time Out","Break Out","Break In","Status"]],body:tableRows, margin:{top:currentY}});
-      currentY+=data.length*6+20;
-    }
-    dateIter.setDate(dateIter.getDate()+1);
+    staffNames = savedStaff;
+    attendance = savedAttendance;
+    supervisor = savedSupervisor;
+    shifts = savedShifts;
   }
-  docPDF.save(`${currentFacility}_${currentRole}_multi_days.pdf`);
-});
 
+  function saveLocalState(){
+    localStorage.setItem(facility+"_"+department+"_staff", JSON.stringify(staffNames));
+    localStorage.setItem(facility+"_"+department+"_attendance", JSON.stringify(attendance));
+    localStorage.setItem(facility+"_"+department+"_supervisor", supervisor);
+    localStorage.setItem(facility+"_"+department+"_shifts", JSON.stringify(shifts));
+  }
+
+  // ----- Dashboard -----
+  function renderDashboard(){
+    document.getElementById("dash-total").textContent = staffNames.length;
+    let present = attendance.filter(a=>a.status==="Present").length;
+    let absent = attendance.filter(a=>a.status==="Absent").length;
+    document.getElementById("dash-present").textContent = present;
+    document.getElementById("dash-absent").textContent = absent;
+    document.getElementById("dash-supervisor").textContent = supervisor || "-";
+  }
+
+  // ----- Staff Table -----
+  function renderStaffTable(){
+    const tbody = document.querySelector("#attendance-table tbody");
+    tbody.innerHTML="";
+    const today = new Date().getDate();
+    staffNames.forEach(name=>{
+      // show only staff scheduled today
+      const shiftsToday = shifts[name]||[];
+      if(!shiftsToday.includes(today)) return;
+
+      let att = attendance.find(a=>a.name===name) || {name, shift:"", timeIn:"", timeOut:"", status:"Absent"};
+      let tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${name}</td>
+        <td><input type="text" class="shift-input" value="${att.shift}" disabled></td>
+        <td><input type="time" class="time-in" value="${att.timeIn}"></td>
+        <td><input type="time" class="time-out" value="${att.timeOut}"></td>
+        <td>
+          <select class="status-select">
+            <option value="Present" ${att.status==="Present"?"selected":""}>Present</option>
+            <option value="Absent" ${att.status==="Absent"?"selected":""}>Absent</option>
+            <option value="On Leave" ${att.status==="On Leave"?"selected":""}>On Leave</option>
+          </select>
+        </td>
+        <td>${supervisor||"-"}</td>
+      `;
+      // Update attendance on change
+      tr.querySelector(".time-in").addEventListener("change", e=>{
+        att.timeIn = e.target.value; updateAttendance(att);
+      });
+      tr.querySelector(".time-out").addEventListener("change", e=>{
+        att.timeOut = e.target.value; updateAttendance(att);
+      });
+      tr.querySelector(".status-select").addEventListener("change", e=>{
+        att.status = e.target.value; updateAttendance(att);
+      });
+      tbody.appendChild(tr);
+    });
+  }
+
+  function updateAttendance(attObj){
+    const idx = attendance.findIndex(a=>a.name===attObj.name);
+    if(idx>-1) attendance[idx]=attObj; else attendance.push(attObj);
+    saveLocalState();
+    renderDashboard();
+    saveToFirebase();
+  }
+
+  // ----- Add Staff -----
+  document.getElementById("add-staff-btn").addEventListener("click", ()=>{
+    const name = document.getElementById("new-staff-name").value.trim();
+    const pass = document.getElementById("admin-pass").value.trim();
+    if(pass!==adminPassword){ alert("Invalid admin password"); return; }
+    if(!name){ alert("Enter staff name"); return; }
+    if(staffNames.includes(name)){ alert("Staff already exists"); return; }
+    staffNames.push(name);
+    saveLocalState(); renderStaffTable(); renderDashboard();
+    document.getElementById("new-staff-name").value="";
+  });
+
+  // ----- Shift Calendar -----
+  function renderCalendar(){
+    const calendarDiv = document.getElementById("calendar");
+    calendarDiv.innerHTML="";
+    const today = new Date();
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth()+1,0).getDate();
+    for(let d=1; d<=daysInMonth; d++){
+      const div = document.createElement("div");
+      div.className="day";
+      div.textContent=d;
+      div.addEventListener("click", ()=>{
+        const user = document.getElementById("shiftUser").value;
+        const adminPass = document.getElementById("admin-shift-pass").value;
+        if(adminPass!==adminPassword){ alert("Invalid admin password"); return; }
+        if(!user){ alert("Select user"); return; }
+        if(!shifts[user]) shifts[user]=[];
+        if(shifts[user].includes(d)) shifts[user] = shifts[user].filter(x=>x!==d);
+        else shifts[user].push(d);
+        div.classList.toggle("assigned");
+        saveLocalState(); renderStaffTable(); saveToFirebase();
+      });
+      calendarDiv.appendChild(div);
+    }
+    // mark assigned days
+    document.getElementById("shiftUser").innerHTML = "";
+    staffNames.forEach(name=>{
+      let opt = document.createElement("option"); opt.value=name; opt.textContent=name;
+      document.getElementById("shiftUser").appendChild(opt);
+    });
+    Object.keys(shifts).forEach(name=>{
+      shifts[name].forEach(d=>{
+        if(d-1<calendarDiv.children.length) calendarDiv.children[d-1].classList.add("assigned");
+      });
+    });
+  }
+
+  document.getElementById("assign-shift-btn").addEventListener("click", ()=>{
+    renderCalendar();
+  });
+
+  // ----- PDF Download -----
+  document.getElementById("download-summary-btn").addEventListener("click", ()=>{
+    let html = "<h2>Attendance Summary</h2><table border='1'><tr><th>Name</th><th>Shift</th><th>Time In</th><th>Time Out</th><th>Status</th><th>Supervisor</th></tr>";
+    attendance.forEach(a=>{
+      html+=`<tr><td>${a.name}</td><td>${a.shift}</td><td>${a.timeIn}</td><td>${a.timeOut}</td><td>${a.status}</td><td>${supervisor||"-"}</td></tr>`;
+    });
+    html+="</table>";
+    const win = window.open();
+    win.document.write(html);
+    win.document.close();
+    win.print();
+  });
+
+  // ----- Firebase Sync -----
+  function saveToFirebase(){
+    set(ref(db, facility+"_"+department), {staff: staffNames, attendance, supervisor, shifts});
+  }
+
+  function loadFromFirebase(){
+    const dbRef = ref(db);
+    get(child(dbRef, facility+"_"+department)).then(snapshot=>{
+      if(snapshot.exists()){
+        const data = snapshot.val();
+        staffNames = data.staff||[];
+        attendance = data.attendance||[];
+        supervisor = data.supervisor||"";
+        shifts = data.shifts||{};
+        saveLocalState();
+        renderStaffTable(); renderDashboard(); renderCalendar();
+      }
+    });
+    onValue(ref(db, facility+"_"+department), snapshot=>{
+      const data = snapshot.val();
+      if(data){
+        staffNames = data.staff||[];
+        attendance = data.attendance||[];
+        supervisor = data.supervisor||"";
+        shifts = data.shifts||{};
+        saveLocalState();
+        renderStaffTable(); renderDashboard(); renderCalendar();
+      }
+    });
+  }
+
+  // Load Firebase after login
+  document.getElementById("login-btn").addEventListener("click", loadFromFirebase);
 </script>
 </body>
 </html>
