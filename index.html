@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>MEDITRACK LIMITED Attendance List</title>
+<title>MEDITRACK LIMITED - General Hospital Attendance</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <!-- EmailJS SDK -->
@@ -12,13 +12,11 @@
 body { font-family: Arial, sans-serif; background: #f7f7fa; margin: 0; padding: 1em; }
 h1 { text-align: center; color: #333; font-size: 1.5em; margin-bottom: 0.5em; }
 #date-today { text-align: right; margin-bottom: 10px; font-size: 1em; }
-table { width: 100%; border-collapse: collapse; background: #fff; margin: 1em auto;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05); font-size: 0.9em; }
+table { width: 100%; border-collapse: collapse; background: #fff; margin: 1em auto; box-shadow: 0 2px 10px rgba(0,0,0,0.05); font-size: 0.9em; }
 th, td { padding: 0.5em; text-align: center; border-bottom: 1px solid #ececec; }
 th { background: #4f8ef7; color: #fff; font-size: 0.9em; }
 tr:last-child td { border-bottom: none; }
-input[type="time"], input[type="date"], input[type="text"] { width: 100%; max-width: 110px; padding: 0.3em;
-        border: 1px solid #ccc; border-radius: 4px; font-size: 0.85em; }
+input[type="time"], input[type="date"], input[type="text"] { width: 100%; max-width: 110px; padding: 0.3em; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85em; }
 select.status, select.shift { padding: 0.3em; border-radius: 4px; border: 1px solid #ccc; font-size: 0.85em; }
 .status-message { font-weight: bold; padding: 0.2em; border-radius: 4px; margin-top: 3px; font-size: 0.8em; }
 .status-present { background: #e6ffe6; color: #1e7e34; }
@@ -26,12 +24,9 @@ select.status, select.shift { padding: 0.3em; border-radius: 4px; border: 1px so
 .status-on-leave { background: #e6f7ff; color: #005cbf; }
 .status-late, .status-late-break { background: #fffbe6; color: #d35400; }
 .status-multi-late { background: #ffe6e6; color: #b8860b; }
-button { margin: 0.5em auto; padding: 0.6em 1.2em; background: #4f8ef7; color: #fff;
-         border: none; border-radius: 6px; font-size: 1em; cursor: pointer; display: inline-block; }
+button { margin: 0.5em auto; padding: 0.6em 1.2em; background: #4f8ef7; color: #fff; border: none; border-radius: 6px; font-size: 1em; cursor: pointer; display: inline-block; }
 button:hover { background: #3563b7; }
-#add-staff-section, #search-section, #summary-section, #supervisor-section { max-width: 100%; margin: 0 auto 1em auto;
-         background: #fff; padding: 1em; border-radius: 12px;
-         box-shadow: 0 2px 10px rgba(0,0,0,0.05); text-align: center; }
+#add-staff-section, #search-section, #summary-section, #supervisor-section { max-width: 100%; margin: 0 auto 1em auto; background: #fff; padding: 1em; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); text-align: center; }
 #summary-output { margin-top: 1em; font-size: 0.9em; overflow-x: auto; }
 .table-container { width: 100%; overflow-x: auto; }
 @media (max-width: 768px) {
@@ -41,14 +36,16 @@ button:hover { background: #3563b7; }
 }
 </style>
 
-<!-- Firebase SDK via CDN -->
+<!-- Firebase CDN -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
+// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyBUldDoEEjByUVqsu8tbOR128GGLTrgE1Q",
   authDomain: "med-attendance-2025.firebaseapp.com",
+  databaseURL: "https://med-attendance-2025-default-rtdb.firebaseio.com",
   projectId: "med-attendance-2025",
   storageBucket: "med-attendance-2025.firebasestorage.app",
   messagingSenderId: "1044593504616",
@@ -58,58 +55,187 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Auto-set admin PIN to "admin" if not set
+// Admin PIN auto-set
 async function ensureAdminPIN() {
   const adminRef = doc(db, 'settings', 'admin');
   const snap = await getDoc(adminRef);
-  if (!snap.exists()) {
-    await setDoc(adminRef, { pin: "admin" });
-    console.log("Admin PIN set to 'admin'");
-  }
+  if (!snap.exists()) await setDoc(adminRef, { pin: "admin" });
 }
-ensureAdminPIN();
+
+// Verify PIN
+async function verifyAdminPIN() {
+  await ensureAdminPIN();
+  const snap = await getDoc(doc(db,'settings','admin'));
+  const pin = snap.data().pin;
+  const input = prompt("Enter Admin PIN:");
+  if(input===null) return false;
+  if(input!==pin){ alert("Incorrect PIN!"); return false; }
+  return true;
+}
+
+// References
+const attendanceCol = collection(db, 'attendance');
+const supervisorsCol = collection(db, 'supervisors');
+
+window.onload = async function() {
+  document.getElementById('current-date').textContent = new Date().toISOString().split('T')[0];
+  loadStaff();
+  loadSupervisor();
+};
+
+// Load staff from Firestore
+async function loadStaff() {
+  const tbody = document.querySelector('#attendance-table tbody');
+  tbody.innerHTML = '';
+  const snapshot = await getDocs(attendanceCol);
+  snapshot.forEach(docSnap => {
+    const data = docSnap.data();
+    const tr = createStaffRow(data.name);
+    tbody.appendChild(tr);
+  });
+}
+
+// Create a table row for staff
+function createStaffRow(name) {
+  const tr = document.createElement('tr');
+  tr.setAttribute('data-name', name.toLowerCase());
+  tr.innerHTML = `
+    <td>${name}</td>
+    <td>
+      <select class="shift">
+        <option value="morning">Morning</option>
+        <option value="night">Night</option>
+      </select>
+    </td>
+    <td><input type="time" class="time-in"></td>
+    <td><input type="time" class="time-out"></td>
+    <td><input type="time" class="break-out"></td>
+    <td><input type="time" class="break-in"></td>
+    <td>
+      <select class="status">
+        <option value="present">Present</option>
+        <option value="absent">Absent</option>
+        <option value="on-leave">On Leave</option>
+      </select>
+      <div class="status-message"></div>
+    </td>
+    <td><button class="delete-staff-btn">Delete</button></td>
+  `;
+  tr.querySelector('.delete-staff-btn').addEventListener('click', async () => {
+    if (await verifyAdminPIN()) {
+      const nameToDelete = name;
+      const snapshot = await getDocs(attendanceCol);
+      snapshot.forEach(async docSnap => {
+        if (docSnap.data().name === nameToDelete) await setDoc(doc(db,'attendance',docSnap.id), {}); 
+      });
+      tr.remove();
+    }
+  });
+  return tr;
+}
+
+// Add staff
+document.getElementById('add-staff-btn').addEventListener('click', async () => {
+  if (!(await verifyAdminPIN())) return;
+  const nameInput = document.getElementById('new-staff-name');
+  const name = nameInput.value.trim();
+  if (!name) return alert('Enter a staff name.');
+  await addDoc(attendanceCol, { name });
+  nameInput.value = '';
+  loadStaff();
+});
+
+// Supervisor functions
+async function loadSupervisor() {
+  const snapshot = await getDocs(supervisorsCol);
+  if (!snapshot.empty) document.getElementById('supervisor-name').value = snapshot.docs[0].data().name;
+}
+
+document.getElementById('add-supervisor-btn').addEventListener('click', async () => {
+  if (!(await verifyAdminPIN())) return;
+  const name = document.getElementById('supervisor-name').value.trim();
+  if (!name) return alert('Enter supervisor name.');
+  const snap = await getDocs(supervisorsCol);
+  if (!snap.empty) alert('Supervisor already exists!'); 
+  else await addDoc(supervisorsCol, { name });
+  loadSupervisor();
+});
+
+document.getElementById('remove-supervisor-btn').addEventListener('click', async () => {
+  if (!(await verifyAdminPIN())) return;
+  const snap = await getDocs(supervisorsCol);
+  snap.forEach(async docSnap => await setDoc(doc(db,'supervisors',docSnap.id), {}));
+  document.getElementById('supervisor-name').value = '';
+});
+
+// Search and clear
+document.getElementById('search-btn').addEventListener('click', () => {
+  const val = document.getElementById('search-name').value.trim().toLowerCase();
+  document.querySelectorAll('#attendance-table tbody tr').forEach(row => {
+    row.style.display = row.getAttribute('data-name').includes(val) ? '' : 'none';
+  });
+});
+document.getElementById('clear-search-btn').addEventListener('click', () => {
+  document.getElementById('search-name').value = '';
+  document.querySelectorAll('#attendance-table tbody tr').forEach(row => row.style.display = '');
+});
+
+// Attendance status checking & summary saving
+function compareTime(t1, t2){ 
+  if(!t1||!t2)return 0; 
+  const [h1,m1]=t1.split(':').map(Number); 
+  const [h2,m2]=t2.split(':').map(Number); 
+  return (h1*60+m1)-(h2*60+m2); 
+}
+
+async function saveAttendanceSummary(summaryData) {
+  const dateStr = new Date().toISOString().split('T')[0];
+  await setDoc(doc(db,'summaries',dateStr), { data: summaryData });
+}
+
+async function checkAndSaveAttendance() {
+  const rows = document.querySelectorAll('#attendance-table tbody tr');
+  let summaryData = [];
+  rows.forEach(row => {
+    const name = row.cells[0].textContent;
+    const shift = row.querySelector('.shift').value;
+    const timeIn = row.querySelector('.time-in').value;
+    const timeOut = row.querySelector('.time-out').value;
+    const breakOut = row.querySelector('.break-out').value;
+    const breakIn = row.querySelector('.break-in').value;
+    const statusSelect = row.querySelector('.status');
+    const statusMsgDiv = row.querySelector('.status-message');
+
+    let statusMsg = statusSelect.value;
+    let statusClass = 'status-present';
+    if(statusMsg==='absent') statusClass='status-absent';
+    else if(statusMsg==='on-leave') statusClass='status-on-leave';
+
+    statusMsgDiv.textContent = statusMsg;
+    statusMsgDiv.className = `status-message ${statusClass}`;
+
+    summaryData.push({name, shift, timeIn, timeOut, breakOut, breakIn, status:statusMsg});
+  });
+
+  await saveAttendanceSummary(summaryData);
+
+  // Send EmailJS
+  let summaryText = summaryData.map(item =>
+    `Name: ${item.name}\nShift: ${item.shift}\nTime In: ${item.timeIn||'-'}\nTime Out: ${item.timeOut||'-'}\nBreak Out: ${item.breakOut||'-'}\nBreak In: ${item.breakIn||'-'}\nStatus: ${item.status}`
+  ).join("\n\n");
+
+  emailjs.init("Wfz_vJ2NRT4YzMoJV");
+  emailjs.send("service_itxtkoc","template_mlh2ahf",{to_email:"dejalizzy25@gmail.com",date:new Date().toISOString().split('T')[0],summary:summaryText})
+    .then(()=>alert('Attendance summary sent!'))
+    .catch(err=>alert('Failed to send email: '+JSON.stringify(err)));
+}
+
+// Add a button at the bottom
+const btn = document.createElement('button');
+btn.textContent = "Check Attendance / Save Summary";
+btn.addEventListener('click', checkAndSaveAttendance);
+document.body.appendChild(btn);
 </script>
-</head>
-<body>
-<h1>MEDITRACK LIMITED Attendance List</h1>
-<div id="date-today">Date: <span id="current-date"></span></div>
-
-<div id="add-staff-section">
-  <input type="text" id="new-staff-name" placeholder="Enter new staff name">
-  <button id="add-staff-btn">Add Staff (Admin PIN required)</button>
-</div>
-
-<div id="supervisor-section">
-  <input type="text" id="supervisor-name" placeholder="Supervisor on duty">
-  <button id="add-supervisor-btn">Add Supervisor (Admin PIN required)</button>
-  <button id="remove-supervisor-btn">Remove Supervisor (Admin PIN required)</button>
-</div>
-
-<div id="search-section">
-  <input type="text" id="search-name" placeholder="Search staff name">
-  <button id="search-btn">Search</button>
-  <button id="clear-search-btn">Clear</button>
-</div>
-
-<div class="table-container">
-  <table id="attendance-table">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Shift</th>
-        <th>Time In</th>
-        <th>Time Out</th>
-        <th>Break Out</th>
-        <th>Break In</th>
-        <th>Status</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-</div>
-
-<button id="check-attendance">Check Attendance / Save Summary</button>
 
 <div id="summary-section">
   <h2>View Past Attendance Summaries</h2>
@@ -119,136 +245,20 @@ ensureAdminPIN();
   <div id="summary-output"></div>
 </div>
 
-<script type="module">
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
-const db = getFirestore();
-
-let staffNames = [];
-
-function createStaffRow(name) {
-  const tr = document.createElement('tr');
-  tr.setAttribute('data-name', name.toLowerCase());
-  tr.innerHTML = `
-    <td>${name}</td>
-    <td><select class="shift"><option value="morning">Morning</option><option value="night">Night</option></select></td>
-    <td><input type="time" class="time-in"></td>
-    <td><input type="time" class="time-out"></td>
-    <td><input type="time" class="break-out"></td>
-    <td><input type="time" class="break-in"></td>
-    <td><select class="status"><option value="present">Present</option><option value="absent">Absent</option><option value="on-leave">On Leave</option></select>
-    <div class="status-message"></div></td>
-    <td><button class="delete-staff-btn">Delete</button></td>
-  `;
-  tr.querySelector('.delete-staff-btn').addEventListener('click', async () => {
-    if (await verifyAdminPIN()) {
-      staffNames = staffNames.filter(n => n !== name);
-      tr.remove();
-    }
-  });
-  return tr;
-}
-
-function populateStaffTable(names){
-  const tbody = document.querySelector('#attendance-table tbody');
-  tbody.innerHTML='';
-  names.forEach(name=>tbody.appendChild(createStaffRow(name)));
-}
-
-async function verifyAdminPIN() {
-  const snap = await getDoc(doc(db, 'settings', 'admin'));
-  const pin = snap.exists() ? snap.data().pin : null;
-  if (!pin) { alert("Admin PIN not set in Firestore!"); return false; }
-  const input = prompt("Enter Admin PIN:");
-  if (input === null) return false;
-  if (input !== pin) { alert("Incorrect PIN!"); return false; }
-  return true;
-}
-
-// Add Staff
-document.getElementById('add-staff-btn').addEventListener('click', async () => {
-  if (!await verifyAdminPIN()) return;
-  const newNameInput = document.getElementById('new-staff-name');
-  const newName = newNameInput.value.trim();
-  if (newName && !staffNames.includes(newName)) {
-    staffNames.push(newName);
-    populateStaffTable(staffNames);
-    newNameInput.value = '';
-  } else alert("Please enter a unique staff name.");
-});
-
-// Supervisor functions
-document.getElementById('add-supervisor-btn').addEventListener('click', async () => {
-  if (!await verifyAdminPIN()) return;
-  const supInput = document.getElementById('supervisor-name');
-  const supName = supInput.value.trim();
-  if (!supName) return alert("Enter supervisor name.");
-  await setDoc(doc(db, 'settings', 'supervisor'), { name: supName });
-  alert(`Supervisor ${supName} added.`);
-  supInput.value = '';
-});
-
-document.getElementById('remove-supervisor-btn').addEventListener('click', async () => {
-  if (!await verifyAdminPIN()) return;
-  await setDoc(doc(db, 'settings', 'supervisor'), { name: "" });
-  alert("Supervisor removed.");
-});
-
-// Attendance summary
-async function checkAndSaveAttendance() {
-  const rows = document.querySelectorAll('#attendance-table tbody tr');
-  const summaryData = [];
-  rows.forEach(row => {
-    const name = row.cells[0].textContent;
-    const shift = row.querySelector('.shift').value;
-    const timeIn = row.querySelector('.time-in').value;
-    const timeOut = row.querySelector('.time-out').value;
-    const breakOut = row.querySelector('.break-out').value;
-    const breakIn = row.querySelector('.break-in').value;
-    const status = row.querySelector('.status').value;
-    row.querySelector('.status-message').textContent = status;
-    summaryData.push({ name, shift, timeIn, timeOut, breakOut, breakIn, status });
-  });
-
-  const today = new Date();
-  const yyyy = today.getFullYear(), mm = String(today.getMonth()+1).padStart(2,'0'), dd = String(today.getDate()).padStart(2,'0');
-  const todayStr = `${yyyy}-${mm}-${dd}`;
-
-  await setDoc(doc(db, 'attendanceSummaries', todayStr), { data: summaryData });
-
-  const summaryText = summaryData.map(item =>
-    `Name: ${item.name}\nShift: ${item.shift}\nTime In: ${item.timeIn || '-'}\nTime Out: ${item.timeOut || '-'}\nBreak Out: ${item.breakOut || '-'}\nBreak In: ${item.breakIn || '-'}\nStatus: ${item.status}`
-  ).join("\n\n");
-
-  emailjs.send("service_itxtkoc", "template_mlh2ahf", { to_email: "dejalizzy25@gmail.com", date: todayStr, summary: summaryText })
-  .then(() => alert("Attendance summary sent!"))
-  .catch(err => alert("Failed to send email: " + JSON.stringify(err)));
-}
-
-document.getElementById('check-attendance').addEventListener('click', checkAndSaveAttendance);
-
-// Populate current date
-window.onload = () => {
-  const today = new Date();
-  const yyyy = today.getFullYear(), mm = String(today.getMonth()+1).padStart(2,'0'), dd = String(today.getDate()).padStart(2,'0');
-  document.getElementById('current-date').textContent = `${yyyy}-${mm}-${dd}`;
-  document.getElementById('summary-date').value = `${yyyy}-${mm}-${dd}`;
-};
-
-// Load past summary
+<script>
 document.getElementById('load-summary').addEventListener('click', async function(){
   const dateStr = document.getElementById('summary-date').value;
-  const snap = await getDoc(doc(db, 'attendanceSummaries', dateStr));
+  const docRef = doc(db,'summaries',dateStr);
+  const snap = await getDoc(docRef);
   const outputDiv = document.getElementById('summary-output');
   outputDiv.innerHTML = '';
-  if (!snap.exists()) { outputDiv.textContent = 'No attendance summary for this date.'; return; }
+  if(!snap.exists()) { outputDiv.textContent='No attendance summary for this date.'; return; }
   const summaryData = snap.data().data;
-  let html = `<table><thead><tr><th>Name</th><th>Shift</th><th>Time In</th><th>Time Out</th><th>Break Out</th><th>Break In</th><th>Status</th></tr></thead><tbody>`;
-  summaryData.forEach(item => {
-    html += `<tr><td>${item.name}</td><td>${item.shift}</td><td>${item.timeIn || '-'}</td><td>${item.timeOut || '-'}</td><td>${item.breakOut || '-'}</td><td>${item.breakIn || '-'}</td><td>${item.status}</td></tr>`;
-  });
-  html += `</tbody></table>`;
-  outputDiv.innerHTML = html;
+  let html=`<table><thead><tr><th>Name</th><th>Shift</th><th>Time In</th><th>Time Out</th><th>Break Out</th><th>Break In</th><th>Status</th></tr></thead><tbody>`;
+  summaryData.forEach(item => { html+=`<tr><td>${item.name}</td><td>${item.shift}</td><td>${item.timeIn||'-'}</td><td>${item.timeOut||'-'}</td><td>${item.breakOut||'-'}</td><td>${item.breakIn||'-'}</td><td>${item.status}</td></tr>`; });
+  html+=`</tbody></table>`; outputDiv.innerHTML = html;
 });
 </script>
+
 </body>
 </html>
