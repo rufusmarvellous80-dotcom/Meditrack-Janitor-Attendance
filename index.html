@@ -2,312 +2,295 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>MEDITRACK LIMITED - General Hospital / LASUCOM</title>
+<title>MEDITRACK LIMITED - Attendance</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-  body { font-family: Arial, sans-serif; background: #f7f7fa; margin:0; padding:0; }
-  #login-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:center; z-index:999; }
-  #login-box { background:#fff; padding:20px; border-radius:8px; width:300px; text-align:center; }
-  input, select, button { margin:5px 0; padding:0.5em; width:90%; border-radius:4px; border:1px solid #ccc; font-size:0.9em; }
-  button { background:#4f8ef7; color:#fff; border:none; cursor:pointer; }
-  button:hover { background:#3563b7; }
-  #dashboard { position: fixed; top:0; left:0; width:220px; height:100%; background:#fff; border-right:1px solid #ccc; padding:10px; box-sizing:border-box; overflow-y:auto; }
-  #dashboard h3 { margin-top:0; }
-  #dashboard div { margin-bottom:10px; }
-  #attendance-section { margin-left:230px; padding:20px; }
-  table { width:100%; border-collapse: collapse; margin-top:10px; }
-  th, td { border:1px solid #ccc; padding:5px; text-align:center; }
-  th { background:#4f8ef7; color:#fff; }
-  .status-present { background:#e6ffe6; color:#1e7e34; }
-  .status-absent { background:#ffe6e6; color:#c82333; }
-  .status-on-leave { background:#e6f7ff; color:#005cbf; }
-  .status-late { background:#fffbe6; color:#d35400; }
-  #calendar { display:grid; grid-template-columns: repeat(7, 1fr); gap:5px; margin-top:10px; }
-  .day { border:1px solid #ccc; padding:5px; text-align:center; cursor:pointer; }
-  .assigned { background:#d3f7d3; }
+body{font-family:Arial,sans-serif;background:#f7f7fa;margin:0;padding:1em;}
+h1{text-align:center;color:#333;font-size:1.5em;margin-bottom:0.5em;}
+#login-section,#attendance-section,#shift-editor,#dashboard{max-width:1200px;margin:1em auto;padding:1em;background:#fff;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,0.05);}
+input,select,button{padding:0.5em;margin:0.3em;border-radius:5px;border:1px solid #ccc;font-size:0.9em;}
+button{background:#4f8ef7;color:#fff;border:none;cursor:pointer;}
+button:hover{background:#3563b7;}
+.table-container{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;margin-top:1em;}
+th,td{padding:0.5em;text-align:center;border-bottom:1px solid #ececec;}
+th{background:#4f8ef7;color:#fff;}
+.status-message{padding:0.2em;margin-top:2px;border-radius:4px;font-size:0.8em;}
+.status-present{background:#e6ffe6;color:#1e7e34;}
+.status-absent{background:#ffe6e6;color:#c82333;}
+.status-on-leave{background:#e6f7ff;color:#005cbf;}
+.status-late{background:#fffbe6;color:#d35400;}
+.status-multi-late{background:#ffe6e6;color:#b8860b;}
+.day{display:inline-block;width:30px;height:30px;line-height:30px;text-align:center;margin:2px;border:1px solid #ccc;cursor:pointer;}
+.assigned{background:#4f8ef7;color:#fff;}
 </style>
 </head>
 <body>
+<h1>MEDITRACK LIMITED - General Hospital / LASUCOM</h1>
 
-<!-- Login Overlay -->
-<div id="login-overlay">
-  <div id="login-box">
-    <h2>MEDITRACK LIMITED</h2>
-    <p>Select Facility:</p>
-    <select id="facility-select">
-      <option value="">--Select Facility--</option>
-      <option value="general">General Hospital</option>
-      <option value="lasucom">LASUCOM</option>
-    </select>
-    <input type="password" id="facility-password" placeholder="Facility Password">
-    <p>Select Department:</p>
-    <select id="department-select">
-      <option value="">--Select Department--</option>
-      <option value="janitor">Janitor</option>
-      <option value="security">Security</option>
-    </select>
-    <input type="password" id="department-password" placeholder="Department Password">
-    <button id="login-btn">Login</button>
-    <div id="login-msg" style="color:red; font-size:0.9em;"></div>
-  </div>
+<!-- LOGIN SECTION -->
+<div id="login-section">
+  <h2>Login</h2>
+  <label>Facility:</label>
+  <select id="facility-select">
+    <option value="">Select Facility</option>
+    <option value="GeneralHospital">General Hospital</option>
+    <option value="LASUCOM">LASUCOM</option>
+  </select><br>
+  <input type="password" id="facility-pass" placeholder="Facility Password"><br>
+  <label>Department:</label>
+  <select id="department-select">
+    <option value="">Select Department</option>
+    <option value="Janitor">Janitor</option>
+    <option value="Security">Security</option>
+  </select><br>
+  <input type="password" id="department-pass" placeholder="Department Password"><br>
+  <button id="login-btn">Login</button>
 </div>
 
-<!-- Dashboard -->
+<!-- DASHBOARD -->
 <div id="dashboard" style="display:none;">
-  <h3>Dashboard</h3>
-  <div><b>Facility:</b> <span id="dash-facility"></span></div>
-  <div><b>Department:</b> <span id="dash-department"></span></div>
-  <div><b>Supervisor:</b> <span id="dash-supervisor"></span></div>
-  <div><b>Total Staff:</b> <span id="dash-total"></span></div>
-  <div><b>Present:</b> <span id="dash-present"></span></div>
-  <div><b>Absent:</b> <span id="dash-absent"></span></div>
-  <div><b>Shift Editor (Admin Only)</b></div>
-  <select id="shiftUser"></select>
-  <div id="calendar"></div>
-  <input type="password" id="admin-shift-pass" placeholder="Admin Password">
-  <button id="assign-shift-btn">Assign/Remove Shift</button>
+  <h2>Dashboard</h2>
+  <div>Total Staff: <span id="dash-total">0</span></div>
+  <div>Present: <span id="dash-present">0</span></div>
+  <div>Absent: <span id="dash-absent">0</span></div>
+  <div>Supervisor on Duty: <span id="dash-supervisor">-</span></div>
 </div>
 
-<!-- Attendance Section -->
+<!-- ATTENDANCE SECTION -->
 <div id="attendance-section" style="display:none;">
-  <h2>Attendance List</h2>
-  <input type="text" id="new-staff-name" placeholder="Add Staff (Admin)">
+  <h2>Attendance</h2>
+  <div class="table-container">
+    <table id="attendance-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Shift</th>
+          <th>Time In</th>
+          <th>Time Out</th>
+          <th>Status</th>
+          <th>Supervisor</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <input type="text" id="new-staff-name" placeholder="Add Staff">
   <input type="password" id="admin-pass" placeholder="Admin Password">
   <button id="add-staff-btn">Add Staff</button>
-  <button id="download-summary-btn">Download Attendance PDF</button>
-
-  <table id="attendance-table">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Shift</th>
-        <th>Time In</th>
-        <th>Time Out</th>
-        <th>Status</th>
-        <th>Supervisor</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <button id="download-summary-btn">Download Summary</button>
 </div>
 
-<script>
-const facilityPasswords = {general:"admin1", lasucom:"admin2"};
-const departmentPasswords = {janitor:"admin1", security:"admin2"};
+<!-- SHIFT EDITOR -->
+<div id="shift-editor" style="display:none;">
+  <h2>Shift Editor</h2>
+  <select id="shiftUser"></select>
+  <input type="password" id="admin-shift-pass" placeholder="Admin Password">
+  <button id="assign-shift-btn">Edit Shifts</button>
+  <div id="calendar"></div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
+
+// Firebase Config
+const firebaseConfig = {
+  apiKey: "AIzaSyBUldDoEEjByUVqsu8tbOR128GGLTrgE1Q",
+  authDomain: "med-attendance-2025.firebaseapp.com",
+  databaseURL: "https://med-attendance-2025-default-rtdb.firebaseio.com",
+  projectId: "med-attendance-2025",
+  storageBucket: "med-attendance-2025.firebasestorage.app",
+  messagingSenderId: "1044593504616",
+  appId: "1:1044593504616:web:b11e2126f577a76bdca6dd"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// Admin passwords
+const facilityPasswords = {GeneralHospital:"admin1", LASUCOM:"admin2"};
+const departmentPasswords = {Janitor:"admin1", Security:"admin2"};
 const adminPassword = "admin";
 
-let facility="", department="";
-let staffNames = [], attendance = [], supervisor = "";
-let shifts = {}; // {staffName: [day1,day2,...]}
+// State
+let facility="", department="", staffNames=[], supervisor="";
 
-// ----- LOGIN -----
-document.getElementById("login-btn").addEventListener("click", ()=>{
-  const f = document.getElementById("facility-select").value;
-  const fpass = document.getElementById("facility-password").value;
-  const d = document.getElementById("department-select").value;
-  const dpass = document.getElementById("department-password").value;
-  const msg = document.getElementById("login-msg");
+// DOM elements
+const loginSection = document.getElementById("login-section");
+const attendanceSection = document.getElementById("attendance-section");
+const dashboard = document.getElementById("dashboard");
+const shiftEditor = document.getElementById("shift-editor");
+const loginBtn = document.getElementById("login-btn");
+const addStaffBtn = document.getElementById("add-staff-btn");
+const downloadBtn = document.getElementById("download-summary-btn");
+const dashTotal = document.getElementById("dash-total");
+const dashPresent = document.getElementById("dash-present");
+const dashAbsent = document.getElementById("dash-absent");
+const dashSupervisor = document.getElementById("dash-supervisor");
+const attendanceTable = document.getElementById("attendance-table").querySelector("tbody");
+const shiftUserSelect = document.getElementById("shiftUser");
+const calendarDiv = document.getElementById("calendar");
 
-  if(!f || !d){ msg.textContent="Select both facility and department"; return; }
-  if(fpass!==facilityPasswords[f]){ msg.textContent="Incorrect facility password"; return; }
-  if(dpass!==departmentPasswords[d]){ msg.textContent="Incorrect department password"; return; }
+// LOGIN
+loginBtn.addEventListener("click",()=>{
+  const fac = document.getElementById("facility-select").value;
+  const facPass = document.getElementById("facility-pass").value;
+  const dept = document.getElementById("department-select").value;
+  const deptPass = document.getElementById("department-pass").value;
 
-  facility=f; department=d;
-  document.getElementById("login-overlay").style.display="none";
-  document.getElementById("dashboard").style.display="block";
-  document.getElementById("attendance-section").style.display="block";
-  document.getElementById("dash-facility").textContent = f==="general"?"General Hospital":"LASUCOM";
-  document.getElementById("dash-department").textContent = d.charAt(0).toUpperCase()+d.slice(1);
+  if(!fac || !dept){ alert("Select facility & department"); return; }
+  if(facPass!==facilityPasswords[fac]){ alert("Wrong facility password"); return; }
+  if(deptPass!==departmentPasswords[dept]){ alert("Wrong department password"); return; }
 
-  loadLocalState();
-  renderStaffTable();
-  renderDashboard();
-  renderCalendar();
+  facility = fac; department = dept;
+  loginSection.style.display="none";
+  attendanceSection.style.display="block";
+  dashboard.style.display="block";
+  shiftEditor.style.display="block";
+  loadAttendance();
 });
-<script type="module">
-  // Firebase Setup
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-  import { getDatabase, ref, set, get, child, onValue } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
 
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
-
-  // ----- Load Local State -----
-  function loadLocalState(){
-    const savedStaff = JSON.parse(localStorage.getItem(facility+"_"+department+"_staff")||"[]");
-    const savedAttendance = JSON.parse(localStorage.getItem(facility+"_"+department+"_attendance")||"[]");
-    const savedSupervisor = localStorage.getItem(facility+"_"+department+"_supervisor")||"";
-    const savedShifts = JSON.parse(localStorage.getItem(facility+"_"+department+"_shifts")||"{}");
-
-    staffNames = savedStaff;
-    attendance = savedAttendance;
-    supervisor = savedSupervisor;
-    shifts = savedShifts;
-  }
-
-  function saveLocalState(){
-    localStorage.setItem(facility+"_"+department+"_staff", JSON.stringify(staffNames));
-    localStorage.setItem(facility+"_"+department+"_attendance", JSON.stringify(attendance));
-    localStorage.setItem(facility+"_"+department+"_supervisor", supervisor);
-    localStorage.setItem(facility+"_"+department+"_shifts", JSON.stringify(shifts));
-  }
-
-  // ----- Dashboard -----
-  function renderDashboard(){
-    document.getElementById("dash-total").textContent = staffNames.length;
-    let present = attendance.filter(a=>a.status==="Present").length;
-    let absent = attendance.filter(a=>a.status==="Absent").length;
-    document.getElementById("dash-present").textContent = present;
-    document.getElementById("dash-absent").textContent = absent;
-    document.getElementById("dash-supervisor").textContent = supervisor || "-";
-  }
-
-  // ----- Staff Table -----
-  function renderStaffTable(){
-    const tbody = document.querySelector("#attendance-table tbody");
-    tbody.innerHTML="";
-    const today = new Date().getDate();
-    staffNames.forEach(name=>{
-      // show only staff scheduled today
-      const shiftsToday = shifts[name]||[];
-      if(!shiftsToday.includes(today)) return;
-
-      let att = attendance.find(a=>a.name===name) || {name, shift:"", timeIn:"", timeOut:"", status:"Absent"};
-      let tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${name}</td>
-        <td><input type="text" class="shift-input" value="${att.shift}" disabled></td>
-        <td><input type="time" class="time-in" value="${att.timeIn}"></td>
-        <td><input type="time" class="time-out" value="${att.timeOut}"></td>
-        <td>
-          <select class="status-select">
-            <option value="Present" ${att.status==="Present"?"selected":""}>Present</option>
-            <option value="Absent" ${att.status==="Absent"?"selected":""}>Absent</option>
-            <option value="On Leave" ${att.status==="On Leave"?"selected":""}>On Leave</option>
-          </select>
-        </td>
-        <td>${supervisor||"-"}</td>
-      `;
-      // Update attendance on change
-      tr.querySelector(".time-in").addEventListener("change", e=>{
-        att.timeIn = e.target.value; updateAttendance(att);
-      });
-      tr.querySelector(".time-out").addEventListener("change", e=>{
-        att.timeOut = e.target.value; updateAttendance(att);
-      });
-      tr.querySelector(".status-select").addEventListener("change", e=>{
-        att.status = e.target.value; updateAttendance(att);
-      });
-      tbody.appendChild(tr);
-    });
-  }
-
-  function updateAttendance(attObj){
-    const idx = attendance.findIndex(a=>a.name===attObj.name);
-    if(idx>-1) attendance[idx]=attObj; else attendance.push(attObj);
-    saveLocalState();
-    renderDashboard();
-    saveToFirebase();
-  }
-
-  // ----- Add Staff -----
-  document.getElementById("add-staff-btn").addEventListener("click", ()=>{
-    const name = document.getElementById("new-staff-name").value.trim();
-    const pass = document.getElementById("admin-pass").value.trim();
-    if(pass!==adminPassword){ alert("Invalid admin password"); return; }
-    if(!name){ alert("Enter staff name"); return; }
-    if(staffNames.includes(name)){ alert("Staff already exists"); return; }
-    staffNames.push(name);
-    saveLocalState(); renderStaffTable(); renderDashboard();
-    document.getElementById("new-staff-name").value="";
+// Load attendance from Firebase
+function loadAttendance(){
+  const dbRef = ref(db, `${facility}/${department}/staff`);
+  get(dbRef).then(snapshot=>{
+    if(snapshot.exists()){
+      staffNames = snapshot.val();
+    } else staffNames = [];
+    populateAttendanceTable();
+    updateDashboard();
+    populateShiftUsers();
+    loadSavedAttendance();
   });
+}
 
-  // ----- Shift Calendar -----
-  function renderCalendar(){
-    const calendarDiv = document.getElementById("calendar");
-    calendarDiv.innerHTML="";
-    const today = new Date();
-    const daysInMonth = new Date(today.getFullYear(), today.getMonth()+1,0).getDate();
-    for(let d=1; d<=daysInMonth; d++){
-      const div = document.createElement("div");
-      div.className="day";
-      div.textContent=d;
-      div.addEventListener("click", ()=>{
-        const user = document.getElementById("shiftUser").value;
-        const adminPass = document.getElementById("admin-shift-pass").value;
-        if(adminPass!==adminPassword){ alert("Invalid admin password"); return; }
-        if(!user){ alert("Select user"); return; }
-        if(!shifts[user]) shifts[user]=[];
-        if(shifts[user].includes(d)) shifts[user] = shifts[user].filter(x=>x!==d);
-        else shifts[user].push(d);
-        div.classList.toggle("assigned");
-        saveLocalState(); renderStaffTable(); saveToFirebase();
-      });
-      calendarDiv.appendChild(div);
-    }
-    // mark assigned days
-    document.getElementById("shiftUser").innerHTML = "";
-    staffNames.forEach(name=>{
-      let opt = document.createElement("option"); opt.value=name; opt.textContent=name;
-      document.getElementById("shiftUser").appendChild(opt);
-    });
-    Object.keys(shifts).forEach(name=>{
-      shifts[name].forEach(d=>{
-        if(d-1<calendarDiv.children.length) calendarDiv.children[d-1].classList.add("assigned");
-      });
-    });
-  }
-
-  document.getElementById("assign-shift-btn").addEventListener("click", ()=>{
-    renderCalendar();
+// Populate attendance table
+function populateAttendanceTable(){
+  attendanceTable.innerHTML="";
+  staffNames.forEach(name=>{
+    const tr = document.createElement("tr");
+    tr.setAttribute("data-name",name);
+    tr.innerHTML = `
+      <td>${name}</td>
+      <td><input type="text" class="shift-input"></td>
+      <td><input type="time" class="time-in"></td>
+      <td><input type="time" class="time-out"></td>
+      <td>
+        <select class="status">
+          <option value="present">Present</option>
+          <option value="absent">Absent</option>
+          <option value="on-leave">On Leave</option>
+        </select>
+        <div class="status-message"></div>
+      </td>
+      <td><input type="text" class="supervisor-input" value="${supervisor}"></td>
+    `;
+    attendanceTable.appendChild(tr);
   });
+}
 
-  // ----- PDF Download -----
-  document.getElementById("download-summary-btn").addEventListener("click", ()=>{
-    let html = "<h2>Attendance Summary</h2><table border='1'><tr><th>Name</th><th>Shift</th><th>Time In</th><th>Time Out</th><th>Status</th><th>Supervisor</th></tr>";
-    attendance.forEach(a=>{
-      html+=`<tr><td>${a.name}</td><td>${a.shift}</td><td>${a.timeIn}</td><td>${a.timeOut}</td><td>${a.status}</td><td>${supervisor||"-"}</td></tr>`;
-    });
-    html+="</table>";
-    const win = window.open();
-    win.document.write(html);
-    win.document.close();
-    win.print();
+// Add staff
+addStaffBtn.addEventListener("click",()=>{
+  const name = document.getElementById("new-staff-name").value.trim();
+  const pass = document.getElementById("admin-pass").value;
+  if(pass!==adminPassword){ alert("Admin password required"); return; }
+  if(!name){ alert("Enter staff name"); return; }
+  if(staffNames.includes(name)){ alert("Staff exists"); return; }
+  staffNames.push(name);
+  updateFirebaseStaff();
+  populateAttendanceTable();
+});
+
+function updateFirebaseStaff(){
+  set(ref(db, `${facility}/${department}/staff`), staffNames);
+}
+
+// Dashboard update
+function updateDashboard(){
+  dashTotal.textContent = staffNames.length;
+  let present=0, absent=0;
+  attendanceTable.querySelectorAll("tr").forEach(row=>{
+    const status = row.querySelector(".status").value;
+    if(status==="present") present++;
+    else if(status==="absent") absent++;
   });
+  dashPresent.textContent = present;
+  dashAbsent.textContent = absent;
+  dashSupervisor.textContent = supervisor || "-";
+}
 
-  // ----- Firebase Sync -----
-  function saveToFirebase(){
-    set(ref(db, facility+"_"+department), {staff: staffNames, attendance, supervisor, shifts});
-  }
+// Shift users
+function populateShiftUsers(){
+  shiftUserSelect.innerHTML="";
+  staffNames.forEach(name=>{
+    const opt = document.createElement("option"); opt.value=name; opt.textContent=name;
+    shiftUserSelect.appendChild(opt);
+  });
+}
 
-  function loadFromFirebase(){
-    const dbRef = ref(db);
-    get(child(dbRef, facility+"_"+department)).then(snapshot=>{
+// Assign shifts
+document.getElementById("assign-shift-btn").addEventListener("click",()=>{
+  const pass = document.getElementById("admin-shift-pass").value;
+  if(pass!==adminPassword){ alert("Admin password required"); return; }
+  const user = shiftUserSelect.value;
+  const shiftVal = prompt("Enter shift for "+user);
+  if(!shiftVal) return;
+  const tr = attendanceTable.querySelector(`tr[data-name="${user}"]`);
+  if(tr) tr.querySelector(".shift-input").value = shiftVal;
+  set(ref(db, `${facility}/${department}/shifts/${user}`), shiftVal);
+});
+
+// PDF Download (text-based)
+downloadBtn.addEventListener("click",()=>{
+  let text = "Attendance Summary - "+facility+" - "+department+"\n\n";
+  attendanceTable.querySelectorAll("tr").forEach(row=>{
+    const cells = row.querySelectorAll("td");
+    text+=`Name: ${cells[0].textContent}, Shift: ${cells[1].querySelector("input").value}, In: ${cells[2].querySelector("input").value || "-"}, Out: ${cells[3].querySelector("input").value || "-"}, Status: ${cells[4].querySelector("select").value}, Supervisor: ${cells[5].querySelector("input").value}\n`;
+  });
+  const blob = new Blob([text],{type:"text/plain"});
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `${facility}_${department}_summary.txt`;
+  link.click();
+});
+
+// Update dashboard on change
+attendanceTable.addEventListener("change",(e)=>updateDashboard());
+
+// Preserve state on reload
+window.addEventListener("beforeunload",()=>{
+  attendanceTable.querySelectorAll("tr").forEach(row=>{
+    const name=row.getAttribute("data-name");
+    const shift=row.querySelector(".shift-input").value;
+    const timeIn=row.querySelector(".time-in").value;
+    const timeOut=row.querySelector(".time-out").value;
+    const status=row.querySelector(".status").value;
+    const sup=row.querySelector(".supervisor-input").value;
+    const data={shift,timeIn,timeOut,status,supervisor:sup};
+    set(ref(db, `${facility}/${department}/attendance/${name}`), data);
+  });
+});
+
+// Load saved attendance
+function loadSavedAttendance(){
+  staffNames.forEach(name=>{
+    get(ref(db, `${facility}/${department}/attendance/${name}`)).then(snapshot=>{
       if(snapshot.exists()){
-        const data = snapshot.val();
-        staffNames = data.staff||[];
-        attendance = data.attendance||[];
-        supervisor = data.supervisor||"";
-        shifts = data.shifts||{};
-        saveLocalState();
-        renderStaffTable(); renderDashboard(); renderCalendar();
+        const tr = attendanceTable.querySelector(`tr[data-name="${name}"]`);
+        if(tr){
+          const data = snapshot.val();
+          tr.querySelector(".shift-input").value=data.shift||"";
+          tr.querySelector(".time-in").value=data.timeIn||"";
+          tr.querySelector(".time-out").value=data.timeOut||"";
+          tr.querySelector(".status").value=data.status||"present";
+          tr.querySelector(".supervisor-input").value=data.supervisor||"";
+        }
       }
     });
-    onValue(ref(db, facility+"_"+department), snapshot=>{
-      const data = snapshot.val();
-      if(data){
-        staffNames = data.staff||[];
-        attendance = data.attendance||[];
-        supervisor = data.supervisor||"";
-        shifts = data.shifts||{};
-        saveLocalState();
-        renderStaffTable(); renderDashboard(); renderCalendar();
-      }
-    });
-  }
-
-  // Load Firebase after login
-  document.getElementById("login-btn").addEventListener("click", loadFromFirebase);
+  });
+}
 </script>
 </body>
 </html>
